@@ -1,0 +1,130 @@
+from django.db import models
+
+
+class Calculation(models.Model):
+    label = models.CharField(max_length=100)
+    capital = models.FloatField()
+    comision = models.FloatField(default=0.35)  # Legacy field
+    
+    # Multi-Currency / Multi-Platform fields
+    tipo_operativa = models.CharField(max_length=20, default='USD')
+    plataforma_compra = models.CharField(max_length=50, default='Binance P2P')
+    plataforma_venta = models.CharField(max_length=50, default='Binance P2P')
+    comision_compra = models.FloatField(default=0.35)
+    comision_venta = models.FloatField(default=0.35)
+    metodo_compra = models.CharField(max_length=50, default='Zinli')
+    metodo_venta = models.CharField(max_length=50, default='Zinli')
+    
+    tasa_venta = models.FloatField()
+    tasa_compra = models.FloatField()
+    tasa_retorno = models.FloatField(default=1.0)
+    
+    ciclos_dia = models.IntegerField(default=1)
+    metodos_pago = models.IntegerField(default=1)
+    
+    # Pre-calculated values
+    monto_venta = models.FloatField()
+    monto_compra = models.FloatField()
+    ganancia_porcentaje = models.FloatField()
+    ganancia_ciclo = models.FloatField()
+    ganancia_diaria = models.FloatField()
+    ganancia_mensual = models.FloatField()
+    tasa_minima_compra = models.FloatField()
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.label} ({self.tipo_operativa}) - {self.capital} USDT"
+
+
+class DailyLog(models.Model):
+    date = models.DateField()
+    profit = models.FloatField(default=0.0)
+    volume = models.FloatField(default=0.0)
+    imported = models.BooleanField(default=False)
+    notes = models.TextField(blank=True, default='')
+    
+    tipo_operativa = models.CharField(max_length=20, default='USD')
+    plataforma_compra = models.CharField(max_length=50, default='Binance P2P')
+    plataforma_venta = models.CharField(max_length=50, default='Binance P2P')
+    comision_compra = models.FloatField(default=0.35)
+    comision_venta = models.FloatField(default=0.35)
+    metodo_compra = models.CharField(max_length=50, default='Zinli')
+    metodo_venta = models.CharField(max_length=50, default='Zinli')
+
+    class Meta:
+        ordering = ['-date', 'id']
+
+    def __str__(self):
+        return f"{self.date} [{self.tipo_operativa}] - Profit: {self.profit} USDT, Vol: {self.volume} USDT"
+
+
+class Wallet(models.Model):
+    CURRENCY_CHOICES = [
+        ('USDT', 'USDT (Tether)'),
+        ('USD', 'USD (Dólar)'),
+        ('VES', 'VES (Bolívares)'),
+    ]
+    
+    name = models.CharField(max_length=100)  # e.g. "Binance USDT Principal"
+    platform = models.CharField(max_length=50)  # e.g. "Binance", "Zinli", "Banesco"
+    currency = models.CharField(max_length=10, choices=CURRENCY_CHOICES)
+    balance = models.FloatField(default=0.0)
+    opening_balance = models.FloatField(default=0.0)
+    is_active = models.BooleanField(default=True)
+    color = models.CharField(max_length=7, default='#2563eb')  # Hex color for UI
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['platform', 'currency']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['name', 'platform', 'currency'],
+                name='unique_wallet_identity'
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.name} ({self.platform}) - {self.balance} {self.currency}"
+
+
+class Transaction(models.Model):
+    TYPE_CHOICES = [
+        ('VENTA_P2P', 'Venta P2P'),
+        ('COMPRA_P2P', 'Compra P2P'),
+        ('DEPOSITO', 'Depósito'),
+        ('RETIRO', 'Retiro'),
+        ('TRANSFERENCIA', 'Transferencia'),
+    ]
+    
+    date = models.DateTimeField()
+    type = models.CharField(max_length=20, choices=TYPE_CHOICES)
+    
+    wallet_from = models.ForeignKey(
+        Wallet, on_delete=models.SET_NULL, null=True, blank=True, 
+        related_name='transactions_out'
+    )
+    wallet_to = models.ForeignKey(
+        Wallet, on_delete=models.SET_NULL, null=True, blank=True, 
+        related_name='transactions_in'
+    )
+    
+    amount_out = models.FloatField(default=0.0)  # Sale de wallet_from
+    amount_in = models.FloatField(default=0.0)   # Entra a wallet_to
+    
+    rate = models.FloatField(default=1.0)  # Tasa de cambio utilizada
+    commission_pct = models.FloatField(default=0.0)  # Comisión P2P %
+    
+    notes = models.TextField(blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-date']
+
+    def __str__(self):
+        fr = self.wallet_from.name if self.wallet_from else 'Externo'
+        to = self.wallet_to.name if self.wallet_to else 'Externo'
+        return f"{self.date.strftime('%Y-%m-%d %H:%M')} | {self.type}: {fr} → {to} | -{self.amount_out} / +{self.amount_in}"
