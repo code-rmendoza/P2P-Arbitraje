@@ -21,6 +21,18 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
+:: Check config files
+if not exist "version.json" (
+    echo [ERROR] version.json no encontrado en la raiz del proyecto.
+    pause
+    exit /b 1
+)
+if not exist "release_config.json" (
+    echo [ERROR] release_config.json no encontrado en la raiz del proyecto.
+    pause
+    exit /b 1
+)
+
 :: Step 0: Add Windows Defender exclusion (requires admin)
 echo [0/5] Verificando exclusion de Windows Defender...
 net session >nul 2>&1

@@ -120,14 +120,17 @@ django_imports = [
     'requests',
 ]
 
-# Only collect frontend dist as data - REMOVED (will copy post-build)
-frontend_datas = []
+# Config files for auto-update system
+config_datas = [
+    (os.path.join(ROOT, 'version.json'), '.'),
+    (os.path.join(ROOT, 'release_config.json'), '.'),
+]
 
 a = Analysis(
     [os.path.join(ROOT, 'run_server.py')],
     pathex=[ROOT, BACKEND],
     binaries=[],
-    datas=frontend_datas,
+    datas=config_datas,
     hiddenimports=django_imports,
     hookspath=[],
     hooksconfig={},

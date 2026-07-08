@@ -82,6 +82,35 @@ No test runner or typecheck script configured for frontend (no vitest, no tsc --
 - **All monetary values are floats** (Django FloatField), not Decimal. Precision issues possible.
 - **No test suite** for frontend. Backend has `calculator/tests.py` (check if populated).
 
+## Auto-Update System
+
+The portable .exe checks for updates on startup via GitHub Releases.
+
+**Config files:**
+- `version.json` — local version (e.g. `{"version": "1.0.0"}`). Bump before each release.
+- `release_config.json` — GitHub repo: `{"owner": "code-rmendoza", "repo": "P2P-Arbitraje"}`
+- `update_state.json` — generated at runtime next to the .exe. Tracks daily API call count.
+
+**Rate limiting:** Max 10 GitHub API calls per day. Counter resets at midnight. Stored in `update_state.json`.
+
+**Update flow:**
+1. On startup, check internet connectivity (socket to 1.1.1.1:53)
+2. If online and checks_today < 10: query `https://api.github.com/repos/{owner}/{repo}/releases/latest`
+3. Compare tag (e.g. `v1.1.0`) with local `version.json` version
+4. If newer: prompt user for confirmation in console
+5. If accepted: download .zip to temp, generate `updater.ps1`, launch it, exit
+6. `updater.ps1` waits for process to exit, replaces files (preserves db.sqlite3), relaunches .exe
+
+**To release a new version:**
+1. Bump `version.json` (e.g. `1.0.0` → `1.1.0`)
+2. Run `build.bat`
+3. Compress `backend\dist\P2P_Arbitrage\` into .zip
+4. Create GitHub Release with tag `v1.1.0`, upload the .zip
+
+**Files excluded from update:**
+- `db.sqlite3` (user data preserved)
+- `update_state.json` (rate limit state preserved)
+
 ## Conventions
 
 - Spanish domain terminology throughout (models, UI, comments)
