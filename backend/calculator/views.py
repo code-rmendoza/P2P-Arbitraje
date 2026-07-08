@@ -424,3 +424,166 @@ def check_update(request):
             'latest_version': local_version,
             'download_url': None,
         })
+
+
+@api_view(['POST'])
+def apply_update(request):
+    import os, sys, json, shutil, zipfile, tempfile, subprocess
+    from pathlib import Path
+
+    def get_data_path():
+        if getattr(sys, 'frozen', False):
+            return Path(sys.executable).parent
+        return Path(__file__).resolve().parent.parent.parent
+
+    def get_base_path():
+        if getattr(sys, 'frozen', False):
+            return Path(sys._MEIPASS)
+        return Path(__file__).resolve().parent.parent.parent
+
+    DATA_DIR = get_data_path()
+    BASE_DIR = get_base_path()
+
+    def load_json(path, default=None):
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            return default
+
+    def parse_version(v):
+        try:
+            parts = v.strip().lstrip('v').split('.')
+            return tuple(int(x) for x in parts)
+        except (ValueError, AttributeError):
+            return (0, 0, 0)
+
+    local_version_file = load_json(DATA_DIR / 'version.json', None)
+    if local_version_file is None:
+        local_version_file = load_json(BASE_DIR / 'version.json', {})
+    local_version = local_version_file.get('version', '0.0.0')
+
+    config = load_json(BASE_DIR / 'release_config.json', {})
+    owner = config.get('owner')
+    repo = config.get('repo')
+
+    if not owner or not repo:
+        return Response({'error': 'Configuracion de repositorio no encontrada'}, status=500)
+
+    import requests
+    url = f"https://api.github.com/repos/{owner}/{repo}/releases/latest"
+    headers = {"Accept": "application/vnd.github.v3+json"}
+    try:
+        resp = requests.get(url, headers=headers, timeout=10)
+        if resp.status_code != 200:
+            return Response({'error': 'No se pudo verificar actualizaciones'}, status=502)
+
+        data = resp.json()
+        tag = data.get("tag_name", "")
+        assets = data.get("assets", [])
+        download_url = None
+        for asset in assets:
+            if asset.get("name", "").endswith(".zip"):
+                download_url = asset.get("browser_download_url")
+                break
+
+        if not download_url:
+            return Response({'error': 'No se encontro archivo ZIP en la release'}, status=502)
+
+        remote_ver = parse_version(tag)
+        local_ver = parse_version(local_version)
+        if remote_ver <= local_ver:
+            return Response({'error': 'Ya tienes la ultima version'}, status=400)
+
+    except Exception as e:
+        return Response({'error': f'Error verificando actualizacion: {str(e)}'}, status=500)
+
+    tmp_dir = Path(tempfile.mkdtemp(prefix="p2p_update_"))
+    zip_path = tmp_dir / "update.zip"
+    try:
+        resp = requests.get(download_url, stream=True, timeout=120)
+        resp.raise_for_status()
+        with open(zip_path, 'wb') as f:
+            for chunk in resp.iter_content(chunk_size=8192):
+                f.write(chunk)
+    except Exception as e:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+        return Response({'error': f'Error descargando: {str(e)}'}, status=502)
+
+    extract_dir = tmp_dir / "extracted"
+    try:
+        with zipfile.ZipFile(zip_path, 'r') as zf:
+            zf.extractall(extract_dir)
+    except zipfile.BadZipFile:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+        return Response({'error': 'Archivo ZIP corrupto'}, status=502)
+
+    items = list(extract_dir.iterdir())
+    source_dir = items[0] if len(items) == 1 and items[0].is_dir() else extract_dir
+
+    app_dir = str(DATA_DIR).replace("'", "''")
+    src_dir = str(source_dir).replace("'", "''")
+
+    ps_script = f'''
+$ErrorActionPreference = "Stop"
+$appDir = '{app_dir}'
+$srcDir = '{src_dir}'
+
+Write-Host "Esperando cierre del proceso..."
+$maxWait = 30
+$waited = 0
+while ($waited -lt $maxWait) {{
+    $proc = Get-Process -Name "P2P_Arbitrage" -ErrorAction SilentlyContinue
+    if (-not $proc) {{ break }}
+    Start-Sleep -Seconds 1
+    $waited++
+}}
+
+Write-Host "Reemplazando archivos..."
+Get-ChildItem -Path $appDir -Recurse -File | Where-Object {{
+    $_.FullName -notlike "*db.sqlite3*" -and
+    $_.FullName -notlike "*update_state.json*"
+}} | Remove-Item -Force -ErrorAction SilentlyContinue
+
+Get-ChildItem -Path $srcDir -Recurse -File | ForEach-Object {{
+    $rel = $_.FullName.Substring($srcDir.Length)
+    $dest = Join-Path $appDir $rel
+    $destDir = Split-Path $dest -Parent
+    if (-not (Test-Path $destDir)) {{ New-Item -ItemType Directory -Path $destDir -Force | Out-Null }}
+    Copy-Item -Path $_.FullName -Destination $dest -Force
+}}
+
+Write-Host "Limpiando archivos temporales..."
+Remove-Item -Path (Split-Path $srcDir) -Recurse -Force -ErrorAction SilentlyContinue
+
+Write-Host "Iniciando P2P Arbitrage..."
+Start-Process -FilePath (Join-Path $appDir "P2P_Arbitrage.exe")
+
+Remove-Item -Path $PSCommandPath -Force -ErrorAction SilentlyContinue
+'''
+    updater_path = tmp_dir / "updater.ps1"
+    with open(updater_path, 'w', encoding='utf-8') as f:
+        f.write(ps_script)
+
+    try:
+        subprocess.Popen(
+            ['powershell', '-ExecutionPolicy', 'Bypass', '-File', str(updater_path)],
+            creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0)
+        )
+    except Exception as e:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+        return Response({'error': f'Error lanzando actualizador: {str(e)}'}, status=500)
+
+    import threading
+    def shutdown_server():
+        import time
+        time.sleep(2)
+        os._exit(0)
+
+    threading.Thread(target=shutdown_server, daemon=True).start()
+
+    return Response({
+        'success': True,
+        'message': f'Actualizando a {tag}... El servidor se reiniciara.',
+        'new_version': tag.lstrip('v'),
+    })

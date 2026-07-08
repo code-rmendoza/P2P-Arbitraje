@@ -3,7 +3,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     CalculationViewSet, DailyLogViewSet, 
     WalletViewSet, TransactionViewSet,
-    calculate_p2p, get_bcv_rate, reset_database, check_update
+    calculate_p2p, get_bcv_rate, reset_database, check_update, apply_update
 )
 
 router = DefaultRouter()
@@ -17,5 +17,6 @@ urlpatterns = [
     path('bcv-rate/', get_bcv_rate, name='bcv-rate'),
     path('reset-db/', reset_database, name='reset-db'),
     path('update-check/', check_update, name='update-check'),
+    path('update-apply/', apply_update, name='update-apply'),
     path('', include(router.urls)),
 ]

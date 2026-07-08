@@ -37,7 +37,8 @@ import {
   deleteTransaction,
   fetchBcvRate,
   resetDatabase,
-  checkUpdate
+  checkUpdate,
+  applyUpdate
 } from './api';
 import type { SavedCalculation, CalculationInput, DailyLog, Wallet, Transaction, UpdateInfo } from './api';
 let globalSyncLock = false;
@@ -49,6 +50,7 @@ function App() {
   // Status
   const [isOnline, setIsOnline] = useState<boolean>(true);
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
+  const [updating, setUpdating] = useState<boolean>(false);
   
   // Calculator 1 State (Operativa Completa)
   const [capital, setCapital] = useState<number>(0);
@@ -251,6 +253,23 @@ function App() {
       if (info?.update_available) setUpdateInfo(info);
     }).catch(() => {});
   }, []);
+
+  const handleApplyUpdate = async () => {
+    if (!confirm('Se descargara y aplicara la nueva version. El servidor se reiniciara. Continuar?')) return;
+    setUpdating(true);
+    try {
+      const result = await applyUpdate();
+      if (result?.success) {
+        alert(result.message + '\nEl navegador se reconectara en unos segundos...');
+      } else {
+        alert('Error al aplicar actualizacion');
+        setUpdating(false);
+      }
+    } catch {
+      alert('Error de conexion al actualizar');
+      setUpdating(false);
+    }
+  };
 
   // Update calculations whenever inputs change
   useEffect(() => {
@@ -1169,16 +1188,15 @@ Ganancia Proyectada al Mes: $${calculationResult.ganancia_mensual.toFixed(2)} US
             {isOnline ? 'SQLite Conectado' : 'Modo Offline (Local)'}
           </div>
           {updateInfo?.update_available && (
-            <a
-              href={updateInfo.release_url || '#'}
-              target="_blank"
-              rel="noopener noreferrer"
+            <button
+              onClick={handleApplyUpdate}
+              disabled={updating}
               className="status-badge update-badge"
               title={`Actualizar de ${updateInfo.current_version} a ${updateInfo.latest_version}`}
             >
               <span className="status-dot update-dot"></span>
-              Update v{updateInfo.latest_version}
-            </a>
+              {updating ? 'Actualizando...' : `Update v${updateInfo.latest_version}`}
+            </button>
           )}
         </div>
       </header>

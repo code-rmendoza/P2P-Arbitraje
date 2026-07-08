@@ -632,3 +632,14 @@ export async function checkUpdate(): Promise<UpdateInfo | null> {
     return null;
   }
 }
+
+export async function applyUpdate(): Promise<{ success: boolean; message: string; new_version: string } | null> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/update-apply/`, { method: 'POST' });
+    const data = await response.json();
+    if (!response.ok) return null;
+    return data;
+  } catch {
+    return null;
+  }
+}
