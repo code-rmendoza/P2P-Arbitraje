@@ -43,3 +43,9 @@ desktop.ini
 
 # Update state (generated at runtime)
 update_state.json
+
+# Logs
+*.log
+
+# Distribution zips
+*.zip
