@@ -33,6 +33,24 @@ export interface SavedCalculation extends CalculationInput, CalculationResult {
 
 const API_BASE_URL = 'http://localhost:8000/api';
 
+let _authToken: string | null = null;
+
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  if (!_authToken) {
+    try {
+      const resp = await fetch(`${API_BASE_URL}/auth-token/`);
+      if (resp.ok) {
+        const data = await resp.json();
+        _authToken = data.token;
+      }
+    } catch { /* offline */ }
+  }
+  if (_authToken) {
+    return { 'Authorization': `Bearer ${_authToken}` };
+  }
+  return {};
+}
+
 // Unified calculations logic (supports USD and VES)
 export function performLocalCalculations(input: CalculationInput): CalculationResult {
   const K = input.capital;
@@ -152,8 +170,10 @@ export async function saveCalculation(input: CalculationInput & { label: string 
 
 export async function deleteCalculation(id: number): Promise<void> {
   try {
+    const authHeaders = await getAuthHeaders();
     const response = await fetch(`${API_BASE_URL}/history/${id}/`, {
       method: 'DELETE',
+      headers: authHeaders,
     });
     if (!response.ok) throw new Error('Error al eliminar del servidor');
   } catch (error) {
@@ -205,10 +225,11 @@ export async function saveLog(input: DailyLogInput): Promise<DailyLog> {
   try {
     const method = input.id ? 'PUT' : 'POST';
     const url = input.id ? `${API_BASE_URL}/logs/${input.id}/` : `${API_BASE_URL}/logs/`;
+    const authHeaders = input.id ? await getAuthHeaders() : {};
     
     const response = await fetch(url, {
       method,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders },
       body: JSON.stringify(input),
     });
     if (!response.ok) throw new Error('Error al guardar registro en el servidor');
@@ -283,8 +304,10 @@ export async function saveLog(input: DailyLogInput): Promise<DailyLog> {
 
 export async function deleteLog(id: number): Promise<void> {
   try {
+    const authHeaders = await getAuthHeaders();
     const response = await fetch(`${API_BASE_URL}/logs/${id}/`, {
       method: 'DELETE',
+      headers: authHeaders,
     });
     if (!response.ok) throw new Error('Error al eliminar registro del servidor');
   } catch (error) {
@@ -408,9 +431,10 @@ export async function saveWallet(input: Omit<Wallet, 'id' | 'created_at'> & { id
   try {
     const method = input.id ? 'PUT' : 'POST';
     const url = input.id ? `${API_BASE_URL}/wallets/${input.id}/` : `${API_BASE_URL}/wallets/`;
+    const authHeaders = input.id ? await getAuthHeaders() : {};
     const response = await fetch(url, {
       method,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders },
       body: JSON.stringify(input),
     });
     if (!response.ok) throw new Error('Error al guardar billetera en el servidor');
@@ -464,8 +488,10 @@ export async function saveWallet(input: Omit<Wallet, 'id' | 'created_at'> & { id
 
 export async function deleteWallet(id: number): Promise<void> {
   try {
+    const authHeaders = await getAuthHeaders();
     const response = await fetch(`${API_BASE_URL}/wallets/${id}/`, {
       method: 'DELETE',
+      headers: authHeaders,
     });
     if (!response.ok) throw new Error('Error al eliminar billetera del servidor');
   } catch (error) {
@@ -561,8 +587,10 @@ export async function saveTransaction(input: Omit<Transaction, 'id' | 'created_a
 
 export async function deleteTransaction(id: number): Promise<void> {
   try {
+    const authHeaders = await getAuthHeaders();
     const response = await fetch(`${API_BASE_URL}/transactions/${id}/`, {
       method: 'DELETE',
+      headers: authHeaders,
     });
     if (!response.ok) throw new Error('Error al eliminar transacción del servidor');
   } catch (error) {
@@ -635,11 +663,10 @@ export async function checkUpdate(): Promise<UpdateInfo | null> {
 
 export async function applyUpdate(): Promise<{ success: boolean; message: string; new_version: string } | null> {
   try {
-    const token = await fetchAuthToken();
-    if (!token) return null;
+    const authHeaders = await getAuthHeaders();
     const response = await fetch(`${API_BASE_URL}/update-apply/`, {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${token}` },
+      headers: authHeaders,
     });
     const data = await response.json();
     if (!response.ok) return null;
@@ -649,28 +676,26 @@ export async function applyUpdate(): Promise<{ success: boolean; message: string
   }
 }
 
-// Auth token management
-let cachedToken: string | null = null;
-
 export async function fetchAuthToken(): Promise<string | null> {
-  if (cachedToken) return cachedToken;
   try {
-    const response = await fetch(`${API_BASE_URL}/auth-token/`);
-    if (!response.ok) return null;
-    const data = await response.json();
-    cachedToken = data.token;
-    return cachedToken;
+    const resp = await fetch(`${API_BASE_URL}/auth-token/`);
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    _authToken = data.token;
+    return _authToken;
   } catch {
     return null;
   }
 }
 
 export async function resetDatabaseSecure(): Promise<void> {
-  const token = await fetchAuthToken();
-  if (!token) throw new Error('No se pudo obtener token de autenticacion');
+  const authHeaders = await getAuthHeaders();
+  if (!Object.keys(authHeaders).length) {
+    throw new Error('No se pudo obtener token de autenticacion');
+  }
   const response = await fetch(`${API_BASE_URL}/reset-db/`, {
     method: 'POST',
-    headers: { 'Authorization': `Bearer ${token}` },
+    headers: authHeaders,
   });
   if (!response.ok) {
     const errData = await response.json().catch(() => ({}));

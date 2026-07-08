@@ -23,6 +23,10 @@ class TransactionLedgerTests(APITestCase):
             color='#2563eb',
         )
         self.url = reverse('transaction-list')
+        # Get auth token for destructive operations
+        from .views import _get_secret_token
+        token = _get_secret_token()
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token}')
 
     def test_creating_transaction_updates_balances(self):
         response = self.client.post(self.url, {

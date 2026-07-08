@@ -1,9 +1,11 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
+from rest_framework.permissions import BasePermission
 from django.utils import timezone
 from django.db import transaction as db_transaction
 from django.db.models import Q
+from decimal import Decimal
 from .models import Calculation, DailyLog, Wallet, Transaction
 from .serializers import (
     CalculationSerializer, DailyLogSerializer, 
@@ -40,6 +42,14 @@ def _check_auth(request):
         return False
     token = auth_header.split(' ', 1)[1]
     return token == _get_secret_token()
+
+
+class RequireAuthForDestructive(BasePermission):
+    """Allow read + create without auth. Require auth for update/delete."""
+    def has_permission(self, request, view):
+        if request.method in ('GET', 'HEAD', 'OPTIONS', 'POST'):
+            return True
+        return _check_auth(request)
 
 
 def compute_p2p_math(capital, tasa_venta, tasa_compra, ciclos_dia, 
@@ -107,6 +117,7 @@ def calculate_p2p(request):
 class CalculationViewSet(viewsets.ModelViewSet):
     queryset = Calculation.objects.all()
     serializer_class = CalculationSerializer
+    permission_classes = [RequireAuthForDestructive]
     
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -146,16 +157,19 @@ class CalculationViewSet(viewsets.ModelViewSet):
 class DailyLogViewSet(viewsets.ModelViewSet):
     queryset = DailyLog.objects.all()
     serializer_class = DailyLogSerializer
+    permission_classes = [RequireAuthForDestructive]
 
 
 class WalletViewSet(viewsets.ModelViewSet):
     queryset = Wallet.objects.all()
     serializer_class = WalletSerializer
+    permission_classes = [RequireAuthForDestructive]
 
 
 class TransactionViewSet(viewsets.ModelViewSet):
     queryset = Transaction.objects.all()
     serializer_class = TransactionSerializer
+    permission_classes = [RequireAuthForDestructive]
 
     def get_queryset(self):
         queryset = Transaction.objects.select_related('wallet_from', 'wallet_to').all()
@@ -188,8 +202,8 @@ class TransactionViewSet(viewsets.ModelViewSet):
         
         wallet_from = data.get('wallet_from')
         wallet_to = data.get('wallet_to')
-        amount_out = float(data.get('amount_out', 0.0))
-        amount_in = float(data.get('amount_in', 0.0))
+        amount_out = Decimal(str(data.get('amount_out', 0)))
+        amount_in = Decimal(str(data.get('amount_in', 0)))
         tx_type = data.get('type')
 
         # Validate: at least one wallet must be involved

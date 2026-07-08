@@ -57,7 +57,8 @@ def _load_or_create_secret_key():
 SECRET_KEY = _load_or_create_secret_key()
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+import os as _os
+DEBUG = _os.environ.get('DJANGO_DEBUG', 'false').lower() in ('true', '1', 'yes')
 
 ALLOWED_HOSTS = []
 
@@ -163,3 +164,12 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:5174",
     "http://127.0.0.1:5174",
 ]
+
+REST_FRAMEWORK = {
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '60/minute',
+    },
+}
