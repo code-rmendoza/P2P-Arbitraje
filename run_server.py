@@ -219,6 +219,8 @@ Write-Host "Reemplazando archivos..."
 Get-ChildItem -Path $appDir -Recurse -File | Where-Object {{
     $_.FullName -notlike "*db.sqlite3*" -and
     $_.FullName -notlike "*update_state.json*" -and
+    $_.FullName -notlike "*secret_key.json*" -and
+    $_.FullName -notlike "*auth_token.json*" -and
     $_.FullName -notlike "*updater.ps1*"
 }} | Remove-Item -Force -ErrorAction SilentlyContinue
 

@@ -44,6 +44,10 @@ desktop.ini
 # Update state (generated at runtime)
 update_state.json
 
+# Secrets (generated at runtime)
+secret_key.json
+auth_token.json
+
 # Logs
 *.log
 

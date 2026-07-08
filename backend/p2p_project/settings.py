@@ -10,17 +10,51 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
+import json
+import secrets
+import sys
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
+def _get_data_dir():
+    if getattr(sys, 'frozen', False):
+        return Path(sys.executable).parent
+    return BASE_DIR
+
+
+def _load_or_create_secret_key():
+    # 1) Environment variable takes precedence
+    env_key = __import__('os').environ.get('DJANGO_SECRET_KEY')
+    if env_key:
+        return env_key
+
+    # 2) Load from file (portable mode: next to exe; dev: project root)
+    data_dir = _get_data_dir()
+    key_file = data_dir / 'secret_key.json'
+    try:
+        with open(key_file, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            key = data.get('secret_key')
+            if key and len(key) >= 32:
+                return key
+    except (FileNotFoundError, json.JSONDecodeError, KeyError):
+        pass
+
+    # 3) Generate new key and persist
+    new_key = secrets.token_urlsafe(50)
+    try:
+        with open(key_file, 'w', encoding='utf-8') as f:
+            json.dump({'secret_key': new_key}, f, indent=2)
+    except OSError:
+        pass  # Non-fatal: will regenerate next startup
+    return new_key
+
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-+xoht_sct+t7(et_86q=j@46&&4^r+xar#x1k0e$2wsxz_4mcq'
+SECRET_KEY = _load_or_create_secret_key()
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
