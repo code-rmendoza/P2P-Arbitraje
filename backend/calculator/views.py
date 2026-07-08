@@ -308,3 +308,119 @@ def reset_database(request):
         return Response({'message': 'Base de datos restablecida con éxito'})
     except Exception as e:
         return Response({'error': f'Error al restablecer la base de datos: {str(e)}'}, status=500)
+
+
+@api_view(['GET'])
+def check_update(request):
+    import os, sys, json
+    from pathlib import Path
+    from datetime import date
+
+    def get_data_path():
+        if getattr(sys, 'frozen', False):
+            return Path(sys.executable).parent
+        return Path(__file__).resolve().parent.parent.parent
+
+    def get_base_path():
+        if getattr(sys, 'frozen', False):
+            return Path(sys._MEIPASS)
+        return Path(__file__).resolve().parent.parent.parent
+
+    DATA_DIR = get_data_path()
+    BASE_DIR = get_base_path()
+
+    def load_json(path, default=None):
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            return default
+
+    def parse_version(v):
+        try:
+            parts = v.strip().lstrip('v').split('.')
+            return tuple(int(x) for x in parts)
+        except (ValueError, AttributeError):
+            return (0, 0, 0)
+
+    def load_update_state():
+        state_path = DATA_DIR / 'update_state.json'
+        state = load_json(state_path, {"last_check_date": "", "checks_today": 0})
+        today = date.today().isoformat()
+        if state.get("last_check_date") != today:
+            state = {"last_check_date": today, "checks_today": 0}
+            with open(state_path, 'w', encoding='utf-8') as f:
+                json.dump(state, f, indent=2)
+        return state
+
+    local_version_file = load_json(DATA_DIR / 'version.json', None)
+    if local_version_file is None:
+        local_version_file = load_json(BASE_DIR / 'version.json', {})
+    local_version = local_version_file.get('version', '0.0.0')
+
+    config = load_json(BASE_DIR / 'release_config.json', {})
+    owner = config.get('owner')
+    repo = config.get('repo')
+
+    if not owner or not repo:
+        return Response({
+            'update_available': False,
+            'current_version': local_version,
+            'latest_version': local_version,
+            'download_url': None,
+        })
+
+    state = load_update_state()
+    if state.get("checks_today", 0) >= 10:
+        return Response({
+            'update_available': False,
+            'current_version': local_version,
+            'latest_version': local_version,
+            'download_url': None,
+            'rate_limited': True,
+        })
+
+    import requests
+    url = f"https://api.github.com/repos/{owner}/{repo}/releases/latest"
+    headers = {"Accept": "application/vnd.github.v3+json"}
+    try:
+        resp = requests.get(url, headers=headers, timeout=10)
+        state["checks_today"] = state.get("checks_today", 0) + 1
+        with open(DATA_DIR / 'update_state.json', 'w', encoding='utf-8') as f:
+            json.dump(state, f, indent=2)
+
+        if resp.status_code != 200:
+            return Response({
+                'update_available': False,
+                'current_version': local_version,
+                'latest_version': local_version,
+                'download_url': None,
+            })
+
+        data = resp.json()
+        tag = data.get("tag_name", "")
+        assets = data.get("assets", [])
+        download_url = None
+        for asset in assets:
+            if asset.get("name", "").endswith(".zip"):
+                download_url = asset.get("browser_download_url")
+                break
+
+        remote_ver = parse_version(tag)
+        local_ver = parse_version(local_version)
+        update_available = remote_ver > local_ver
+
+        return Response({
+            'update_available': update_available,
+            'current_version': local_version,
+            'latest_version': tag.lstrip('v'),
+            'download_url': download_url,
+            'release_url': f"https://github.com/{owner}/{repo}/releases/tag/{tag}",
+        })
+    except Exception:
+        return Response({
+            'update_available': False,
+            'current_version': local_version,
+            'latest_version': local_version,
+            'download_url': None,
+        })

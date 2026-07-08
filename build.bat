@@ -34,7 +34,7 @@ if not exist "release_config.json" (
 )
 
 :: Step 0: Add Windows Defender exclusion (requires admin)
-echo [0/5] Verificando exclusion de Windows Defender...
+echo [0/7] Verificando exclusion de Windows Defender...
 net session >nul 2>&1
 if %errorlevel% equ 0 (
     powershell -Command "Add-MpExclusion -Path '%~dp0backend\dist' -ErrorAction SilentlyContinue"
@@ -48,7 +48,7 @@ if %errorlevel% equ 0 (
 echo.
 
 :: Step 1: Install Python dependencies
-echo [1/5] Instalando dependencias de Python...
+echo [1/7] Instalando dependencias de Python...
 cd backend
 pip install -r requirements.txt
 if %errorlevel% neq 0 (
@@ -59,7 +59,7 @@ if %errorlevel% neq 0 (
 cd ..
 
 :: Step 2: Build frontend
-echo [2/5] Construyendo frontend...
+echo [2/7] Construyendo frontend...
 cd frontend
 pnpm install
 pnpm build
@@ -71,23 +71,27 @@ if %errorlevel% neq 0 (
 cd ..
 
 :: Step 3: Collect Django static files
-echo [3/5] Recopilando archivos estaticos de Django...
+echo [3/7] Recopilando archivos estaticos de Django...
 cd backend
 python manage.py collectstatic --noinput
 cd ..
 
 :: Step 4: Build .exe with PyInstaller
-echo [4/6] Generando .exe con PyInstaller...
+echo [4/7] Generando .exe con PyInstaller...
 cd backend
 pyinstaller ..\P2P_Portable.spec --noconfirm --clean
 cd ..
 
 :: Step 5: Copy frontend dist to output
-echo [5/6] Copiando frontend al directorio de salida...
+echo [5/7] Copiando frontend al directorio de salida...
 xcopy /E /I /Y "frontend\dist" "backend\dist\P2P_Arbitrage\frontend_dist"
 
-:: Step 6: Add final exclusion for the .exe
-echo [6/6] Configurando exclusion final...
+:: Step 6: Copy version.json next to .exe
+echo [6/7] Copiando version.json...
+copy /Y "version.json" "backend\dist\P2P_Arbitrage\version.json"
+
+:: Step 7: Add final exclusion for the .exe
+echo [7/7] Configurando exclusion final...
 net session >nul 2>&1
 if %errorlevel% equ 0 (
     powershell -Command "Add-MpExclusion -Path '%~dp0backend\dist\P2P_Arbitrage\P2P_Arbitrage.exe' -ErrorAction SilentlyContinue"

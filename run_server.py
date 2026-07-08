@@ -107,7 +107,9 @@ def has_internet():
         return False
 
 def get_local_version():
-    v = load_json(DATA_DIR / 'version.json', {})
+    v = load_json(DATA_DIR / 'version.json', None)
+    if v is None:
+        v = load_json(BASE_DIR / 'version.json', {})
     return v.get('version', '0.0.0')
 
 def parse_version(v):
@@ -251,28 +253,28 @@ def open_browser():
     time.sleep(1.5)
     webbrowser.open(f'http://{HOST}:{PORT}')
 
+def check_and_prompt_update():
+    time.sleep(3)
+    if not has_internet():
+        return
+    update_info = check_for_update()
+    if not update_info:
+        return
+    tag = update_info["tag"]
+    zip_url = update_info["zip_url"]
+    local_ver = get_local_version()
+    remote_ver = parse_version(tag)
+    local_ver_t = parse_version(local_ver)
+    if remote_ver > local_ver_t and zip_url:
+        print(f"\n  *** Nueva version disponible: {tag} (actual: {local_ver}) ***")
+        print(f"  Descargue manualmente desde: https://github.com/code-rmendoza/P2P-Arbitraje/releases")
+        print()
+    else:
+        print(f"  [Update] Version actual: {local_ver} - Sin actualizaciones disponibles.")
+
 def main():
     if getattr(sys, 'frozen', False):
-        if has_internet():
-            update_info = check_for_update()
-            if update_info:
-                tag = update_info["tag"]
-                zip_url = update_info["zip_url"]
-                local_ver = get_local_version()
-                remote_ver = parse_version(tag)
-                local_ver_t = parse_version(local_ver)
-
-                if remote_ver > local_ver_t and zip_url:
-                    print(f"\n  Nueva version disponible: {tag} (actual: {local_ver})")
-                    try:
-                        resp = input("  Desea actualizar? (s/n): ").strip().lower()
-                    except EOFError:
-                        resp = 'n'
-                    if resp == 's':
-                        if download_and_update(tag, zip_url):
-                            return
-                    else:
-                        print("  Continuando sin actualizar...")
+        threading.Thread(target=check_and_prompt_update, daemon=True).start()
 
     threading.Thread(target=open_browser, daemon=True).start()
     try:

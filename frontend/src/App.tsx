@@ -36,9 +36,10 @@ import {
   saveTransaction,
   deleteTransaction,
   fetchBcvRate,
-  resetDatabase
+  resetDatabase,
+  checkUpdate
 } from './api';
-import type { SavedCalculation, CalculationInput, DailyLog, Wallet, Transaction } from './api';
+import type { SavedCalculation, CalculationInput, DailyLog, Wallet, Transaction, UpdateInfo } from './api';
 let globalSyncLock = false;
 
 function App() {
@@ -47,6 +48,7 @@ function App() {
   
   // Status
   const [isOnline, setIsOnline] = useState<boolean>(true);
+  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   
   // Calculator 1 State (Operativa Completa)
   const [capital, setCapital] = useState<number>(0);
@@ -241,6 +243,13 @@ function App() {
     // Periodically verify connection
     const interval = setInterval(loadData, 10000);
     return () => clearInterval(interval);
+  }, []);
+
+  // Check for updates on mount
+  useEffect(() => {
+    checkUpdate().then(info => {
+      if (info?.update_available) setUpdateInfo(info);
+    }).catch(() => {});
   }, []);
 
   // Update calculations whenever inputs change
@@ -1154,9 +1163,23 @@ Ganancia Proyectada al Mes: $${calculationResult.ganancia_mensual.toFixed(2)} US
             <span className="logo-badge">V1.1</span>
           </h1>
         </div>
-        <div className={`status-badge ${isOnline ? 'online' : 'offline'}`}>
-          <span className="status-dot"></span>
-          {isOnline ? 'SQLite Conectado' : 'Modo Offline (Local)'}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <div className={`status-badge ${isOnline ? 'online' : 'offline'}`}>
+            <span className="status-dot"></span>
+            {isOnline ? 'SQLite Conectado' : 'Modo Offline (Local)'}
+          </div>
+          {updateInfo?.update_available && (
+            <a
+              href={updateInfo.release_url || '#'}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="status-badge update-badge"
+              title={`Actualizar de ${updateInfo.current_version} a ${updateInfo.latest_version}`}
+            >
+              <span className="status-dot update-dot"></span>
+              Update v{updateInfo.latest_version}
+            </a>
+          )}
         </div>
       </header>
 

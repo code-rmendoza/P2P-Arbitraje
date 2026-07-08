@@ -73,6 +73,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 1rem;
   position: sticky;
   top: 0;
   z-index: 50;
@@ -141,6 +142,24 @@ body {
 
 .status-badge.offline .status-dot {
   background-color: var(--color-danger);
+  animation: pulse 2s infinite;
+}
+
+.status-badge.update-badge {
+  background-color: #fef3c7;
+  color: #92400e;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.status-badge.update-badge:hover {
+  background-color: #fde68a;
+}
+
+.status-dot.update-dot {
+  background-color: #f59e0b;
   animation: pulse 2s infinite;
 }
 

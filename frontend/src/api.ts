@@ -613,3 +613,22 @@ export async function resetDatabase(): Promise<void> {
     throw new Error(errData.error || 'Error al restablecer la base de datos');
   }
 }
+
+export interface UpdateInfo {
+  update_available: boolean;
+  current_version: string;
+  latest_version: string;
+  download_url: string | null;
+  release_url?: string;
+  rate_limited?: boolean;
+}
+
+export async function checkUpdate(): Promise<UpdateInfo | null> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/update-check/`);
+    if (!response.ok) return null;
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
