@@ -1,7 +1,6 @@
-django
-djangorestframework
-django-cors-headers
-waitress
-pyinstaller
-beautifulsoup4
-requests
+Django==6.0.3
+djangorestframework==3.16.1
+django-cors-headers==4.9.0
+waitress==3.0.2
+beautifulsoup4==4.14.3
+requests==2.33.1

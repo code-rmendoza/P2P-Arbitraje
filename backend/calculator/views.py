@@ -9,6 +9,37 @@ from .serializers import (
     CalculationSerializer, DailyLogSerializer, 
     WalletSerializer, TransactionSerializer
 )
+import os, sys, json
+from pathlib import Path
+
+
+def _get_data_dir():
+    if getattr(sys, 'frozen', False):
+        return Path(sys.executable).parent
+    return Path(__file__).resolve().parent.parent.parent
+
+
+def _get_secret_token():
+    data_dir = _get_data_dir()
+    token_file = data_dir / 'auth_token.json'
+    try:
+        with open(token_file, 'r') as f:
+            data = json.load(f)
+            return data.get('token', '')
+    except (FileNotFoundError, json.JSONDecodeError):
+        import secrets
+        token = secrets.token_urlsafe(32)
+        with open(token_file, 'w') as f:
+            json.dump({'token': token}, f)
+        return token
+
+
+def _check_auth(request):
+    auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+    if not auth_header.startswith('Bearer '):
+        return False
+    token = auth_header.split(' ', 1)[1]
+    return token == _get_secret_token()
 
 
 def compute_p2p_math(capital, tasa_venta, tasa_compra, ciclos_dia, 
@@ -299,13 +330,15 @@ def reset_database(request):
     """
     Deletes all records from Calculation, DailyLog, Wallet, and Transaction.
     """
+    if not _check_auth(request):
+        return Response({'error': 'Autenticacion requerida. Envie Authorization: Bearer <token>'}, status=401)
     from .models import Calculation, DailyLog, Wallet, Transaction
     try:
         Calculation.objects.all().delete()
         DailyLog.objects.all().delete()
         Wallet.objects.all().delete()
         Transaction.objects.all().delete()
-        return Response({'message': 'Base de datos restablecida con éxito'})
+        return Response({'message': 'Base de datos restablecida con exito'})
     except Exception as e:
         return Response({'error': f'Error al restablecer la base de datos: {str(e)}'}, status=500)
 
@@ -431,6 +464,9 @@ def apply_update(request):
     import os, sys, json, shutil, zipfile, tempfile, subprocess
     from pathlib import Path
 
+    if not _check_auth(request):
+        return Response({'error': 'Autenticacion requerida. Envie Authorization: Bearer <token>'}, status=401)
+
     def get_data_path():
         if getattr(sys, 'frozen', False):
             return Path(sys.executable).parent
@@ -542,7 +578,8 @@ while ($waited -lt $maxWait) {{
 Write-Host "Reemplazando archivos..."
 Get-ChildItem -Path $appDir -Recurse -File | Where-Object {{
     $_.FullName -notlike "*db.sqlite3*" -and
-    $_.FullName -notlike "*update_state.json*"
+    $_.FullName -notlike "*update_state.json*" -and
+    $_.FullName -notlike "*auth_token.json*"
 }} | Remove-Item -Force -ErrorAction SilentlyContinue
 
 Get-ChildItem -Path $srcDir -Recurse -File | ForEach-Object {{
@@ -587,3 +624,15 @@ Remove-Item -Path $PSCommandPath -Force -ErrorAction SilentlyContinue
         'message': f'Actualizando a {tag}... El servidor se reiniciara.',
         'new_version': tag.lstrip('v'),
     })
+
+
+@api_view(['GET'])
+def get_auth_token(request):
+    """
+    Returns the secret token. Only accessible from localhost.
+    """
+    host = request.META.get('REMOTE_ADDR', '')
+    if host not in ('127.0.0.1', '::1', 'localhost'):
+        return Response({'error': 'Solo accesible desde localhost'}, status=403)
+    token = _get_secret_token()
+    return Response({'token': token})

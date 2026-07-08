@@ -36,7 +36,7 @@ import {
   saveTransaction,
   deleteTransaction,
   fetchBcvRate,
-  resetDatabase,
+  resetDatabaseSecure,
   checkUpdate,
   applyUpdate
 } from './api';
@@ -944,7 +944,7 @@ Ganancia Proyectada al Mes: $${calculationResult.ganancia_mensual.toFixed(2)} US
       return;
     }
     try {
-      await resetDatabase();
+      await resetDatabaseSecure();
     } catch (e) {
       console.warn('Backend reset failed or offline:', e);
     }

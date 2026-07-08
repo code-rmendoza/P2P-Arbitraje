@@ -635,11 +635,45 @@ export async function checkUpdate(): Promise<UpdateInfo | null> {
 
 export async function applyUpdate(): Promise<{ success: boolean; message: string; new_version: string } | null> {
   try {
-    const response = await fetch(`${API_BASE_URL}/update-apply/`, { method: 'POST' });
+    const token = await fetchAuthToken();
+    if (!token) return null;
+    const response = await fetch(`${API_BASE_URL}/update-apply/`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
     const data = await response.json();
     if (!response.ok) return null;
     return data;
   } catch {
     return null;
+  }
+}
+
+// Auth token management
+let cachedToken: string | null = null;
+
+export async function fetchAuthToken(): Promise<string | null> {
+  if (cachedToken) return cachedToken;
+  try {
+    const response = await fetch(`${API_BASE_URL}/auth-token/`);
+    if (!response.ok) return null;
+    const data = await response.json();
+    cachedToken = data.token;
+    return cachedToken;
+  } catch {
+    return null;
+  }
+}
+
+export async function resetDatabaseSecure(): Promise<void> {
+  const token = await fetchAuthToken();
+  if (!token) throw new Error('No se pudo obtener token de autenticacion');
+  const response = await fetch(`${API_BASE_URL}/reset-db/`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.error || 'Error al restablecer la base de datos');
   }
 }
