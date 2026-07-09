@@ -5,34 +5,6 @@ echo   P2P Arbitrage - Build Portable (.exe)
 echo ============================================
 echo.
 
-:: Check Python
-python --version >nul 2>&1
-if %errorlevel% neq 0 (
-    echo [ERROR] Python no encontrado. Instala Python 3.10+ y agrega al PATH.
-    pause
-    exit /b 1
-)
-
-:: Check pnpm
-pnpm --version >nul 2>&1
-if %errorlevel% neq 0 (
-    echo [ERROR] pnpm no encontrado. Instala con: npm install -g pnpm
-    pause
-    exit /b 1
-)
-
-:: Check config files
-if not exist "version.json" (
-    echo [ERROR] version.json no encontrado en la raiz del proyecto.
-    pause
-    exit /b 1
-)
-if not exist "release_config.json" (
-    echo [ERROR] release_config.json no encontrado en la raiz del proyecto.
-    pause
-    exit /b 1
-)
-
 :: Step 0: Add Windows Defender exclusion (requires admin)
 echo [0/7] Verificando exclusion de Windows Defender...
 net session >nul 2>&1
@@ -111,5 +83,3 @@ if %errorlevel% equ 0 (
 ) else (
     echo [ERROR] Error durante la compilacion.
 )
-
-pause
