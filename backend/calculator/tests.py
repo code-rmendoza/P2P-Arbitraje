@@ -3,9 +3,10 @@ from django.utils import timezone
 from decimal import Decimal
 from rest_framework import status
 from rest_framework.test import APITestCase
+from unittest.mock import patch
 
 from .models import Wallet, Transaction, DailyLog, Calculation
-from .views import _get_secret_token
+from .auth import _get_secret_token
 
 
 class TransactionLedgerTests(APITestCase):
@@ -149,9 +150,18 @@ class AuthRequiredTests(APITestCase):
         resp = self.client.get(reverse('wallet-list'))
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
 
-    def test_post_wallet_open_no_auth(self):
+    def test_post_wallet_requires_auth(self):
+        # No auth -> 403
+        self.client.credentials()  # clear credentials
         resp = self.client.post(reverse('wallet-list'), {
             'name': 'Test', 'platform': 'P', 'currency': 'USDT', 'balance': 50, 'color': '#000'
+        }, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
+        # With auth -> 201
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.token}')
+        resp = self.client.post(reverse('wallet-list'), {
+            'name': 'Test2', 'platform': 'P', 'currency': 'USDT', 'balance': 50, 'color': '#000'
         }, format='json')
         self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
 
@@ -223,3 +233,167 @@ class CalculateValidationTests(APITestCase):
         }, format='json')
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertIn('ganancia_diaria', resp.data)
+
+
+class FinancialRobustnessTests(APITestCase):
+    """Tests for the new Financial Robustness and Data Consistency logic."""
+    def setUp(self):
+        self.token = _get_secret_token()
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.token}')
+
+    def test_duplicate_wallet_rejected(self):
+        # Create initial wallet
+        Wallet.objects.create(name='Binance USDT', platform='Binance', currency='USDT', balance=100)
+        
+        # Try to post duplicate wallet with different balance -> 400 Bad Request
+        resp = self.client.post(reverse('wallet-list'), {
+            'name': 'Binance USDT',
+            'platform': 'Binance',
+            'currency': 'USDT',
+            'balance': 200,
+            'color': '#ff0000'
+        }, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        # Check that unique constraint validation caught the duplicate
+        self.assertIn('non_field_errors', resp.data)
+
+    def test_daily_log_accumulation(self):
+        log_url = reverse('dailylog-list')
+        
+        # Create first daily log
+        resp1 = self.client.post(log_url, {
+            'date': '2026-07-09',
+            'profit': 15.50,
+            'volume': 1000.00,
+            'notes': 'Primer movimiento',
+            'tipo_operativa': 'USD',
+            'metodo_compra': 'Zinli',
+            'metodo_venta': 'Zinli'
+        }, format='json')
+        self.assertEqual(resp1.status_code, status.HTTP_201_CREATED)
+        
+        # Post another log with accumulate = True -> 200 OK and sums fields
+        resp2 = self.client.post(log_url, {
+            'date': '2026-07-09',
+            'profit': 10.25,
+            'volume': 500.00,
+            'notes': 'Segundo movimiento',
+            'tipo_operativa': 'USD',
+            'metodo_compra': 'Zinli',
+            'metodo_venta': 'Zinli',
+            'accumulate': True
+        }, format='json')
+        self.assertEqual(resp2.status_code, status.HTTP_200_OK)
+        
+        # Verify changes in DB
+        self.assertEqual(DailyLog.objects.count(), 1)
+        log = DailyLog.objects.first()
+        self.assertEqual(float(log.profit), 25.75)
+        self.assertEqual(float(log.volume), 1500.00)
+        self.assertIn('Primer movimiento\nSegundo movimiento', log.notes)
+
+
+class SecurityDevOpsTests(APITestCase):
+    """Tests for auto-updater SHA-256 verification and security validation."""
+    def setUp(self):
+        self.token = _get_secret_token()
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.token}')
+
+    @patch('requests.get')
+    def test_apply_update_missing_checksum(self, mock_get):
+        class MockReleaseResponse:
+            status_code = 200
+            def json(self):
+                return {
+                    "tag_name": "v9.9.9",
+                    "assets": [
+                        {
+                            "name": "P2P_Arbitrage.zip",
+                            "browser_download_url": "https://github.com/code-rmendoza/P2P-Arbitraje/releases/download/v9.9.9/P2P_Arbitrage.zip"
+                        }
+                    ]
+                }
+        
+        class MockDownloadResponse:
+            status_code = 200
+            def raise_for_status(self):
+                pass
+            def iter_content(self, chunk_size=8192):
+                return [b"file data"]
+
+        def side_effect(url, *args, **kwargs):
+            if "releases/latest" in url:
+                return MockReleaseResponse()
+            return MockDownloadResponse()
+
+        mock_get.side_effect = side_effect
+
+        resp = self.client.post(reverse('update-apply'))
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('Falta firma digital', resp.data['error'])
+
+    @patch('requests.get')
+    def test_apply_update_invalid_checksum(self, mock_get):
+        class MockReleaseResponse:
+            status_code = 200
+            def json(self):
+                return {
+                    "tag_name": "v9.9.9",
+                    "assets": [
+                        {
+                            "name": "P2P_Arbitrage.zip",
+                            "browser_download_url": "https://github.com/code-rmendoza/P2P-Arbitraje/releases/download/v9.9.9/P2P_Arbitrage.zip"
+                        },
+                        {
+                            "name": "P2P_Arbitrage.zip.sha256",
+                            "browser_download_url": "https://github.com/code-rmendoza/P2P-Arbitraje/releases/download/v9.9.9/P2P_Arbitrage.zip.sha256"
+                        }
+                    ]
+                }
+        
+        class MockDownloadResponse:
+            status_code = 200
+            def raise_for_status(self):
+                pass
+            def iter_content(self, chunk_size=8192):
+                return [b"file data"]
+
+        class MockShaResponse:
+            status_code = 200
+            text = "wronghash12345wronghash12345wronghash12345wronghash12345wronghash"
+            def raise_for_status(self):
+                pass
+
+        def side_effect(url, *args, **kwargs):
+            if "releases/latest" in url:
+                return MockReleaseResponse()
+            if "P2P_Arbitrage.zip.sha256" in url:
+                return MockShaResponse()
+            return MockDownloadResponse()
+
+        mock_get.side_effect = side_effect
+
+        resp = self.client.post(reverse('update-apply'))
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('Violacion de integridad', resp.data['error'])
+
+    @patch('requests.get')
+    def test_bcv_rate_scraping_fails_uses_fallback(self, mock_get):
+        # Clean up any existing cache file first to test cold start fallback
+        import os
+        from calculator.utils import _get_data_dir
+        cache_path = _get_data_dir() / 'bcv_rate_cache.json'
+        if cache_path.exists():
+            try:
+                os.remove(cache_path)
+            except Exception:
+                pass
+
+        # Simulate connection error on requests.get
+        mock_get.side_effect = Exception("Connection Timeout")
+
+        resp = self.client.get(reverse('bcv-rate'))
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp.data['rate'], 36.50)
+        self.assertTrue(resp.data['fallback_contingency'])
+        self.assertIn('warning', resp.data)

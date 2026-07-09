@@ -29,18 +29,6 @@ class WalletSerializer(serializers.ModelSerializer):
         if 'opening_balance' not in validated_data:
             validated_data['opening_balance'] = validated_data.get('balance', 0.0)
 
-        existing = Wallet.objects.filter(
-            name=validated_data.get('name'),
-            platform=validated_data.get('platform'),
-            currency=validated_data.get('currency'),
-        ).first()
-
-        if existing:
-            for field, value in validated_data.items():
-                setattr(existing, field, value)
-            existing.save()
-            return existing
-
         return super().create(validated_data)
 
 

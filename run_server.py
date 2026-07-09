@@ -35,10 +35,18 @@ from django.core.wsgi import get_wsgi_application
 from django.core.management import call_command
 from waitress import serve
 
+PORT = int(os.environ.get('P2P_PORT', 8000))
+HOST = os.environ.get('P2P_HOST', '127.0.0.1')
+
 settings.DATABASES['default']['NAME'] = str(DATA_DIR / 'db.sqlite3')
 settings.STATIC_ROOT = str(BASE_DIR / 'staticfiles')
 settings.DEBUG = False
-settings.ALLOWED_HOSTS = ['*']
+
+if HOST == '0.0.0.0':
+    settings.ALLOWED_HOSTS = ['*']
+else:
+    settings.ALLOWED_HOSTS = [HOST, '127.0.0.1', 'localhost']
+
 settings.CORS_ALLOWED_ORIGINS = []
 settings.CORS_ALLOW_ALL_ORIGINS = False
 
@@ -50,8 +58,10 @@ if not db_path.exists():
 
 django_app = get_wsgi_application()
 
-if getattr(sys, 'frozen', False):
-    FRONTEND_DIST = Path(sys.executable).parent / 'frontend_dist'
+# Determine frontend_dist directory dynamically
+FRONTEND_DIST = Path(sys.executable).parent / 'frontend_dist' if getattr(sys, 'frozen', False) else Path(__file__).resolve().parent / 'frontend_dist'
+
+if FRONTEND_DIST.exists():
     INDEX_FILE = FRONTEND_DIST / 'index.html'
 
     class SPAMiddleware:
@@ -74,6 +84,15 @@ if getattr(sys, 'frozen', False):
             if os.path.isfile(str(INDEX_FILE)):
                 with open(str(INDEX_FILE), 'rb') as f:
                     content = f.read()
+                try:
+                    from calculator.auth import _get_secret_token
+                    token = _get_secret_token()
+                    html = content.decode('utf-8', errors='ignore')
+                    injected_script = f'<script>window.__P2P_TOKEN__ = "{token}";</script></head>'
+                    html = html.replace('</head>', injected_script, 1)
+                    content = html.encode('utf-8')
+                except Exception:
+                    pass
                 start_response('200 OK', [('Content-Type', 'text/html'), ('Content-Length', str(len(content)))])
                 return [content]
             return self.app(environ, start_response)
@@ -81,9 +100,6 @@ if getattr(sys, 'frozen', False):
     wsgi_app = SPAMiddleware(django_app)
 else:
     wsgi_app = django_app
-
-PORT = int(os.environ.get('P2P_PORT', 8000))
-HOST = '127.0.0.1'
 
 MAX_DAILY_CHECKS = 10
 
@@ -278,7 +294,8 @@ def main():
     if getattr(sys, 'frozen', False):
         threading.Thread(target=check_and_prompt_update, daemon=True).start()
 
-    threading.Thread(target=open_browser, daemon=True).start()
+    if HOST != '0.0.0.0':
+        threading.Thread(target=open_browser, daemon=True).start()
     try:
         serve(wsgi_app, host=HOST, port=PORT, threads=4)
     except KeyboardInterrupt:

@@ -1,0 +1,19 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: code-rmendoza/p2p-arbitraje:latest
+    container_name: p2p_arbitrage_app
+    ports:
+      - "8000:8000"
+    environment:
+      - P2P_PORT=8000
+      - P2P_HOST=0.0.0.0
+    volumes:
+      - p2p_data:/app
+    restart: unless-stopped
+
+volumes:
+  p2p_data:
+    driver: local

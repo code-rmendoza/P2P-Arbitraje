@@ -111,7 +111,10 @@ export async function fetchCalculations(): Promise<SavedCalculation[]> {
     const response = await fetch(`${API_BASE_URL}/history/`);
     if (!response.ok) throw new Error('Error al obtener historial del servidor');
     return await response.json();
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && error.name !== 'TypeError') {
+      throw error;
+    }
     const local = localStorage.getItem('p2p_simulations');
     return local ? JSON.parse(local) : [];
   }
@@ -127,14 +130,17 @@ export async function saveCalculation(input: CalculationInput & { label: string 
   };
 
   try {
-    const response = await fetch(`${API_BASE_URL}/history/`, {
+    const response = await authFetch(`${API_BASE_URL}/history/`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newSim),
     });
     if (!response.ok) throw new Error('Error al guardar simulacion en el servidor');
     return await response.json();
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && error.name !== 'TypeError') {
+      throw error;
+    }
     const local = localStorage.getItem('p2p_simulations');
     const list: SavedCalculation[] = local ? JSON.parse(local) : [];
     list.unshift(newSim);
@@ -147,7 +153,10 @@ export async function deleteCalculation(id: number): Promise<void> {
   try {
     const response = await authFetch(`${API_BASE_URL}/history/${id}/`, { method: 'DELETE' });
     if (!response.ok) throw new Error('Error al eliminar del servidor');
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && error.name !== 'TypeError') {
+      throw error;
+    }
     const local = localStorage.getItem('p2p_simulations');
     if (local) {
       const list: SavedCalculation[] = JSON.parse(local);

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { ArrowRightLeft, CheckCircle, Loader2 } from 'lucide-react';
 import { applyUpdate, fetchBcvRate, resetDatabaseSecure, saveLog } from './api';
+import type { SavedCalculation, Wallet, Transaction } from './api';
 
 import { useAppData } from './hooks/useAppData';
 import { useCalculator } from './hooks/useCalculator';
@@ -138,7 +139,7 @@ function App() {
     }
   };
 
-  const handleLoadSimulation = (sim: any) => {
+  const handleLoadSimulation = (sim: SavedCalculation) => {
     calc.handleLoadSimulation(sim);
     setActiveTab('operative');
     showNotification('Cargada simulacion: ' + sim.label, 'info');
@@ -194,11 +195,11 @@ function App() {
     await portfolio.handleSaveWallet(showNotification);
   };
 
-  const handleDeactivateWallet = async (wallet: any) => {
+  const handleDeactivateWallet = async (wallet: Wallet) => {
     await portfolio.handleDeactivateWallet(wallet, showNotification);
   };
 
-  const handleDeleteWallet = async (wallet: any) => {
+  const handleDeleteWallet = async (wallet: Wallet) => {
     await portfolio.handleDeleteWallet(wallet, showNotification);
   };
 
@@ -206,7 +207,7 @@ function App() {
     await portfolio.handleSaveTransaction(tasaBcv, showNotification);
   };
 
-  const handleDeleteTransaction = async (tx: any) => {
+  const handleDeleteTransaction = async (tx: Transaction) => {
     await portfolio.handleDeleteTransaction(tx, showNotification);
   };
 

@@ -11,6 +11,8 @@ import {
 } from '../api';
 import type { SavedCalculation, DailyLog, Wallet, Transaction, UpdateInfo } from '../api';
 
+import { amountToUsdt } from '../utils/currency';
+
 export function useAppData() {
   const [isOnline, setIsOnline] = useState<boolean>(true);
   const [history, setHistory] = useState<SavedCalculation[]>([]);
@@ -20,12 +22,6 @@ export function useAppData() {
   const [currentVersion, setCurrentVersion] = useState<string>('');
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   const syncLock = useRef(false);
-
-  const amountToUsdt = (amount: number, currency?: string | null, tasaBcv: number = 0) => {
-    if (currency === 'USDT' || currency === 'USD') return amount;
-    if (currency === 'VES') return tasaBcv > 0 ? amount / tasaBcv : 0;
-    return 0;
-  };
 
   const syncAllHistoricalTransactionsToLogbook = async (
     allTxs: Transaction[],
@@ -112,11 +108,6 @@ export function useAppData() {
       setLogs(dataLogs);
       setWallets(dataWallets);
       setTransactions(dataTransactions);
-
-      await syncAllHistoricalTransactionsToLogbook(dataTransactions, dataLogs, dataWallets, tasaBcv);
-
-      const updatedLogs = await fetchLogs();
-      setLogs(updatedLogs);
 
       setIsOnline(true);
     } catch {

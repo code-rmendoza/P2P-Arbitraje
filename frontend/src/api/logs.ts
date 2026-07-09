@@ -26,7 +26,10 @@ export async function fetchLogs(): Promise<DailyLog[]> {
     const response = await fetch(`${API_BASE_URL}/logs/`);
     if (!response.ok) throw new Error('Error al obtener bitacora del servidor');
     return await response.json();
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && error.name !== 'TypeError') {
+      throw error;
+    }
     const local = localStorage.getItem('p2p_logs');
     return local ? JSON.parse(local) : [];
   }
@@ -44,7 +47,10 @@ export async function saveLog(input: DailyLogInput): Promise<DailyLog> {
     });
     if (!response.ok) throw new Error('Error al guardar registro en el servidor');
     return await response.json();
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && error.name !== 'TypeError') {
+      throw error;
+    }
     const local = localStorage.getItem('p2p_logs');
     const list: DailyLog[] = local ? JSON.parse(local) : [];
     let finalLog: DailyLog;
@@ -104,7 +110,10 @@ export async function deleteLog(id: number): Promise<void> {
   try {
     const response = await authFetch(`${API_BASE_URL}/logs/${id}/`, { method: 'DELETE' });
     if (!response.ok) throw new Error('Error al eliminar registro del servidor');
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && error.name !== 'TypeError') {
+      throw error;
+    }
     const local = localStorage.getItem('p2p_logs');
     if (local) {
       const list: DailyLog[] = JSON.parse(local);

@@ -1429,3 +1429,119 @@ body {
 .spin-animation {
   animation: spin 1s linear infinite;
 }
+
+/* Custom Helper Utilities for PortfolioTab */
+.card-header-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 1rem;
+}
+
+.action-buttons-group {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.btn-icon-label {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.btn-danger-outline {
+  color: #dc2626 !important;
+  border-color: #fca5a5 !important;
+}
+
+.btn-danger-outline:hover {
+  background-color: #fef2f2 !important;
+}
+
+.filter-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.select-filter-compact {
+  width: 180px;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.select-filter-auto {
+  width: auto;
+  min-width: 180px;
+}
+
+.select-filter-limit {
+  width: auto;
+  min-width: 120px;
+}
+
+.text-success {
+  color: var(--color-success) !important;
+}
+
+.text-danger {
+  color: var(--color-danger) !important;
+}
+
+.text-muted-val {
+  color: var(--text-muted);
+}
+
+.wallet-meta-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.input-date-compact {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.9rem;
+}
+
+.btn-square-compact {
+  padding: 0.35rem;
+}
+
+.btn-square-ledger {
+  padding: 0.3rem;
+}
+
+.margin-bottom-1rem {
+  margin-bottom: 1rem;
+}
+
+.icon-small {
+  width: 0.85rem;
+  height: 0.85rem;
+}
+
+.icon-medium {
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+.icon-large {
+  width: 1rem;
+  height: 1rem;
+}
+
+.icon-logo-size {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+

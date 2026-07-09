@@ -26,21 +26,27 @@ export async function fetchTransactions(): Promise<Transaction[]> {
     const response = await fetch(`${API_BASE_URL}/transactions/`);
     if (!response.ok) throw new Error('Error al obtener transacciones del servidor');
     return await response.json();
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && error.name !== 'TypeError') {
+      throw error;
+    }
     const local = localStorage.getItem('p2p_transactions');
     return local ? JSON.parse(local) : [];
   }
 }
 
-export async function saveTransaction(input: Omit<Transaction, 'id' | 'created_at'>): Promise<Transaction> {
+export async function saveTransaction(
+  input: Omit<Transaction, 'id' | 'created_at'>,
+  tasaBcv: number = 0
+): Promise<Transaction> {
   try {
-    const response = await fetch(`${API_BASE_URL}/transactions/`, {
+    const response = await authFetch(`${API_BASE_URL}/transactions/`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(input),
+      body: JSON.stringify({ ...input, tasa_bcv: tasaBcv }),
     });
     if (!response.ok) {
-      const errData = await response.json();
+      const errData = await response.json().catch(() => ({}));
       throw new Error(errData.error || 'Error al guardar transaccion en el servidor');
     }
     return await response.json();
@@ -87,6 +93,50 @@ export async function saveTransaction(input: Omit<Transaction, 'id' | 'created_a
     txs.unshift(finalTx);
     localStorage.setItem('p2p_transactions', JSON.stringify(txs));
 
+    // Handle offline DailyLog creation
+    if (input.type === 'COMPRA_P2P' || input.type === 'VENTA_P2P') {
+      const amountToUsdtLocal = (amount: number, currency?: string | null) => {
+        if (currency === 'USDT' || currency === 'USD') return amount;
+        if (currency === 'VES') return tasaBcv > 0 ? amount / tasaBcv : 0;
+        return 0;
+      };
+
+      const txDateStr = finalTx.date.split('T')[0];
+      const fromCurr = fromW?.currency || null;
+      const toCurr = toW?.currency || null;
+
+      const vol = fromCurr === 'USDT' || fromCurr === 'USD'
+        ? input.amount_out
+        : (toCurr === 'USDT' || toCurr === 'USD' ? input.amount_in : amountToUsdtLocal(input.amount_out, fromCurr));
+
+      const inUsdt = amountToUsdtLocal(input.amount_in, toCurr);
+      const outUsdt = amountToUsdtLocal(input.amount_out, fromCurr);
+      const prof = inUsdt - outUsdt;
+
+      const localLogs = localStorage.getItem('p2p_logs');
+      const listLogs = localLogs ? JSON.parse(localLogs) : [];
+
+      const newLog = {
+        id: Date.now(),
+        date: txDateStr,
+        profit: parseFloat(prof.toFixed(4)),
+        volume: parseFloat(vol.toFixed(2)),
+        notes: `[Auto-Transaccion #${finalTx.id}] Movimiento: ${input.type} | Ruta: ${fromW?.name || 'Externo'} → ${toW?.name || 'Externo'} | Tasa: ${input.rate} | Notas: ${input.notes || ''}`,
+        imported: true,
+        tipo_operativa: fromCurr === 'VES' || toCurr === 'VES' ? 'VES' : 'USD',
+        plataforma_compra: input.type === 'COMPRA_P2P' ? toW?.platform || 'P2P' : fromW?.platform || 'P2P',
+        plataforma_venta: input.type === 'VENTA_P2P' ? fromW?.platform || 'P2P' : toW?.platform || 'P2P',
+        comision_compra: input.type === 'COMPRA_P2P' ? input.commission_pct : 0,
+        comision_venta: input.type === 'VENTA_P2P' ? input.commission_pct : 0,
+        metodo_compra: input.type === 'COMPRA_P2P' ? fromW?.name || 'P2P' : toW?.name || 'P2P',
+        metodo_venta: input.type === 'VENTA_P2P' ? fromW?.name || 'P2P' : toW?.name || 'P2P',
+      };
+
+      listLogs.push(newLog);
+      listLogs.sort((a: any, b: any) => b.date.localeCompare(a.date));
+      localStorage.setItem('p2p_logs', JSON.stringify(listLogs));
+    }
+
     return finalTx;
   }
 }
@@ -95,7 +145,10 @@ export async function deleteTransaction(id: number): Promise<void> {
   try {
     const response = await authFetch(`${API_BASE_URL}/transactions/${id}/`, { method: 'DELETE' });
     if (!response.ok) throw new Error('Error al eliminar transaccion del servidor');
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && error.name !== 'TypeError') {
+      throw error;
+    }
     const localTxs = localStorage.getItem('p2p_transactions');
     if (localTxs) {
       const txs: Transaction[] = JSON.parse(localTxs);

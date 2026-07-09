@@ -1,4 +1,10 @@
-export const API_BASE_URL = 'http://localhost:8000/api';
+export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+
+declare global {
+  interface Window {
+    __P2P_TOKEN__?: string;
+  }
+}
 
 const TOKEN_KEY = 'p2p_auth_token';
 
@@ -14,9 +20,14 @@ function clearStoredToken() {
   try { localStorage.removeItem(TOKEN_KEY); } catch { /* ignore */ }
 }
 
-let _authToken: string | null = getStoredToken();
+let _authToken: string | null = window.__P2P_TOKEN__ || getStoredToken();
 
 export async function fetchTokenFromServer(): Promise<string | null> {
+  if (window.__P2P_TOKEN__) {
+    _authToken = window.__P2P_TOKEN__;
+    storeToken(_authToken);
+    return _authToken;
+  }
   try {
     const resp = await fetch(`${API_BASE_URL}/auth-token/`);
     if (resp.ok) {

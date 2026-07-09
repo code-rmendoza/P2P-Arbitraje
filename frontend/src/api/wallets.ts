@@ -50,7 +50,10 @@ export async function fetchWallets(): Promise<Wallet[]> {
     }
 
     return serverWallets;
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && error.name !== 'TypeError') {
+      throw error;
+    }
     const local = localStorage.getItem('p2p_wallets');
     if (!local) {
       localStorage.setItem('p2p_wallets', JSON.stringify([]));
@@ -71,9 +74,16 @@ export async function saveWallet(input: Omit<Wallet, 'id' | 'created_at'> & { id
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(input),
     });
-    if (!response.ok) throw new Error('Error al guardar billetera en el servidor');
+    if (!response.ok) {
+      const errData = await response.json().catch(() => ({}));
+      const msg = errData.non_field_errors?.[0] || errData.error || 'Error al guardar billetera en el servidor';
+      throw new Error(msg);
+    }
     return await response.json();
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && error.name !== 'TypeError') {
+      throw error;
+    }
     const local = localStorage.getItem('p2p_wallets');
     const list: Wallet[] = local ? normalizeWallets(JSON.parse(local)) : [];
     let finalWallet: Wallet;
@@ -121,7 +131,10 @@ export async function deleteWallet(id: number): Promise<void> {
   try {
     const response = await authFetch(`${API_BASE_URL}/wallets/${id}/`, { method: 'DELETE' });
     if (!response.ok) throw new Error('Error al eliminar billetera del servidor');
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && error.name !== 'TypeError') {
+      throw error;
+    }
     const local = localStorage.getItem('p2p_wallets');
     if (local) {
       const list: Wallet[] = JSON.parse(local);

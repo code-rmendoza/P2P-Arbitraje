@@ -151,27 +151,27 @@ export function PortfolioTab({
   return (
     <div className="card">
       <div className="card-title">
-        <WalletCards className="logo-icon" style={{ width: '1.5rem', height: '1.5rem' }} />
+        <WalletCards className="logo-icon icon-logo-size" />
         Portafolio & Libro Contable
       </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>
-        <div className="card-subtitle" style={{ margin: 0 }}>
+      <div className="card-header-actions">
+        <div className="card-subtitle">
           Saldos reales por billetera y movimientos de doble entrada.
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <button className="btn btn-secondary" onClick={() => exportPortfolioPDF({
+        <div className="action-buttons-group">
+          <button className="btn btn-secondary btn-icon-label" onClick={() => exportPortfolioPDF({
             wallets, transactions: displayedTransactions, totalUsdt: totalPortfolioUsdt,
             profitUsdt: realPortfolioProfitUsdt, profitPct: realPortfolioProfitPct, tasaBcv,
-          })} title="Exportar portafolio a PDF" style={{ padding: '0.4rem 0.75rem', fontSize: '0.85rem', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-            <FileDown style={{ width: '0.85rem', height: '0.85rem' }} />
+          })} title="Exportar portafolio a PDF">
+            <FileDown className="icon-small" />
             Exportar PDF
           </button>
-          <button className="btn btn-secondary" onClick={handleResetSystem} title="Restablecer base de datos" style={{ padding: '0.4rem 0.75rem', fontSize: '0.85rem', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '0.3rem', color: '#dc2626', borderColor: '#fca5a5' }}>
-            <Trash2 style={{ width: '0.85rem', height: '0.85rem' }} />
+          <button className="btn btn-secondary btn-icon-label btn-danger-outline" onClick={handleResetSystem} title="Restablecer base de datos">
+            <Trash2 className="icon-small" />
             Reiniciar Sistema
           </button>
-          <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>Filtrar Periodo:</span>
-          <select className="form-input" style={{ width: '180px', padding: '0.4rem 0.75rem', fontSize: '0.85rem', margin: 0 }} value={portfolioDateFilter} onChange={(e) => setPortfolioDateFilter(e.target.value)}>
+          <span className="filter-label">Filtrar Periodo:</span>
+          <select className="form-input select-filter-compact" value={portfolioDateFilter} onChange={(e) => setPortfolioDateFilter(e.target.value)}>
             <option value="today">Hoy</option>
             <option value="yesterday">Ayer</option>
             <option value="month">Este Mes</option>
@@ -252,18 +252,18 @@ export function PortfolioTab({
       </div>
 
       <div className="ledger-filter-row">
-        <h3 className="card-title" style={{ fontSize: '1.05rem', marginBottom: 0 }}>Billeteras</h3>
+        <h3 className="card-title select-filter-limit">Billeteras</h3>
         <button className="btn btn-primary" onClick={() => handleOpenWalletModal()}>
-          <Plus style={{ width: '1rem', height: '1rem' }} />
+          <Plus className="icon-large" />
           Agregar Billetera
         </button>
       </div>
 
       {wallets.length === 0 ? (
-        <div className="empty-state" style={{ padding: '2rem', marginBottom: '1.5rem' }}>
+        <div className="empty-state">
           <Info className="empty-state-icon" />
-          <div style={{ fontWeight: 700 }}>Sin billeteras</div>
-          <div style={{ fontSize: '0.85rem' }}>Crea tus cuentas iniciales para empezar a registrar movimientos.</div>
+          <div className="font-bold">Sin billeteras</div>
+          <div className="text-muted-val font-small">Crea tus cuentas iniciales para empezar a registrar movimientos.</div>
         </div>
       ) : (
         <div className="wallets-grid">
@@ -290,23 +290,23 @@ export function PortfolioTab({
                   <span className="wallet-balance-val">{closing.toFixed(wallet.currency === 'VES' ? 0 : 2)}</span>
                   <span className="wallet-balance-curr">{wallet.currency}</span>
                 </div>
-                <div className="metric-desc" style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                <div className="wallet-meta-container metric-desc">
                   <span>Inicial: {opening.toFixed(wallet.currency === 'VES' ? 0 : 2)} {wallet.currency}</span>
                   <span style={{ fontWeight: 600, color: walletProfit > 0.0001 ? 'var(--color-success-hover)' : walletProfit < -0.0001 ? 'var(--color-danger)' : 'var(--text-muted)' }}>
                     Profit: {walletProfit > 0.0001 ? '+' : ''}{walletProfit.toFixed(wallet.currency === 'VES' ? 0 : 2)} {wallet.currency}
                   </span>
                 </div>
                 <div className="wallet-card-actions">
-                  <button className="btn btn-secondary" style={{ padding: '0.35rem' }} onClick={() => handleOpenWalletModal(wallet)} title="Editar">
-                    <Edit3 style={{ width: '0.9rem', height: '0.9rem' }} />
+                  <button className="btn btn-secondary btn-square-compact" onClick={() => handleOpenWalletModal(wallet)} title="Editar">
+                    <Edit3 className="icon-medium" />
                   </button>
                   {wallet.is_active ? (
-                    <button className="btn btn-secondary" style={{ padding: '0.35rem' }} onClick={() => handleDeactivateWallet(wallet)} title="Desactivar">
-                      <X style={{ width: '0.9rem', height: '0.9rem' }} />
+                    <button className="btn btn-secondary btn-square-compact" onClick={() => handleDeactivateWallet(wallet)} title="Desactivar">
+                      <X className="icon-medium" />
                     </button>
                   ) : (
-                    <button className="btn btn-danger" style={{ padding: '0.35rem' }} onClick={() => handleDeleteWallet(wallet)} title="Eliminar">
-                      <Trash2 style={{ width: '0.9rem', height: '0.9rem' }} />
+                    <button className="btn btn-danger btn-square-compact" onClick={() => handleDeleteWallet(wallet)} title="Eliminar">
+                      <Trash2 className="icon-medium" />
                     </button>
                   )}
                 </div>
@@ -318,8 +318,8 @@ export function PortfolioTab({
 
       <div className="tx-separator"></div>
 
-      <h3 className="card-title" style={{ fontSize: '1.05rem', marginBottom: '1rem' }}>Registrar Movimiento</h3>
-      <div className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
+      <h3 className="card-title margin-bottom-1rem">Registrar Movimiento</h3>
+      <div className="form-grid select-filter-auto">
         <div className="form-group">
           <label className="form-label">Billetera Origen</label>
           <select className="form-input" value={txWalletFrom} onChange={(e) => setTxWalletFrom(e.target.value)}>
@@ -351,7 +351,7 @@ export function PortfolioTab({
         </div>
         <div className="form-group">
           <label className="form-label">Fecha de Operacion</label>
-          <input type="datetime-local" className="form-input" style={{ padding: '0.5rem 0.75rem', fontSize: '0.9rem' }} value={txDate} onChange={(e) => setTxDate(e.target.value)} />
+          <input type="datetime-local" className="form-input input-date-compact" value={txDate} onChange={(e) => setTxDate(e.target.value)} />
         </div>
       </div>
 
@@ -375,26 +375,26 @@ export function PortfolioTab({
         </div>
       </div>
 
-      <div className="form-group" style={{ marginBottom: '1rem' }}>
+      <div className="form-group margin-bottom-1rem">
         <label className="form-label">Notas</label>
         <input className="form-input" value={txNotes} onChange={(e) => setTxNotes(e.target.value)} onFocus={(e) => e.target.select()} placeholder="Referencia, contraparte o detalle de la operacion" />
       </div>
       <button className="btn btn-primary" onClick={handleSaveTransaction}>
-        <CheckCircle style={{ width: '1rem', height: '1rem' }} />
+        <CheckCircle className="icon-large" />
         Registrar Movimiento
       </button>
 
       <div className="ledger-container">
         <div className="ledger-filter-row">
-          <h3 className="card-title" style={{ fontSize: '1.05rem', marginBottom: 0 }}>Historial de Movimientos</h3>
-          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'nowrap', alignItems: 'center' }}>
-            <select className="form-input" style={{ width: 'auto', minWidth: '180px' }} value={ledgerWalletFilter} onChange={(e) => setLedgerWalletFilter(e.target.value)}>
+          <h3 className="card-title select-filter-limit">Historial de Movimientos</h3>
+          <div className="action-buttons-group">
+            <select className="form-input select-filter-auto" value={ledgerWalletFilter} onChange={(e) => setLedgerWalletFilter(e.target.value)}>
               <option value="">Todas las billeteras</option>
               {wallets.map(wallet => (
                 <option key={wallet.id} value={wallet.id}>{wallet.name}</option>
               ))}
             </select>
-            <select className="form-input" style={{ width: 'auto', minWidth: '120px' }} value={ledgerLimit} onChange={(e) => setLedgerLimit(e.target.value)}>
+            <select className="form-input select-filter-limit" value={ledgerLimit} onChange={(e) => setLedgerLimit(e.target.value)}>
               <option value="5">Ultimos 5</option>
               <option value="10">Ultimos 10</option>
               <option value="20">Ultimos 20</option>
@@ -420,7 +420,7 @@ export function PortfolioTab({
             <tbody>
               {displayedTransactions.length === 0 ? (
                 <tr>
-                  <td colSpan={8} style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Sin movimientos registrados.</td>
+                  <td colSpan={8} className="text-center text-muted-val">Sin movimientos registrados.</td>
                 </tr>
               ) : (
                 displayedTransactions.map(tx => (
@@ -430,7 +430,7 @@ export function PortfolioTab({
                     <td>
                       <div className="tx-route-col">
                         <span>{tx.wallet_from_name || 'Externo'}</span>
-                        <ArrowRight className="tx-route-arrow" style={{ width: '0.9rem', height: '0.9rem' }} />
+                        <ArrowRight className="tx-route-arrow icon-medium" />
                         <span>{tx.wallet_to_name || 'Externo'}</span>
                       </div>
                     </td>
@@ -439,8 +439,8 @@ export function PortfolioTab({
                     <td>{tx.rate.toFixed(4)}</td>
                     <td>{tx.commission_pct.toFixed(2)}%</td>
                     <td>
-                      <button className="btn btn-danger" style={{ padding: '0.3rem' }} onClick={() => handleDeleteTransaction(tx)} title="Eliminar">
-                        <Trash2 style={{ width: '0.85rem', height: '0.85rem' }} />
+                      <button className="btn btn-danger btn-square-ledger" onClick={() => handleDeleteTransaction(tx)} title="Eliminar">
+                        <Trash2 className="icon-small" />
                       </button>
                     </td>
                   </tr>
