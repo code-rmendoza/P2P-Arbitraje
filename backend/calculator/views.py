@@ -88,21 +88,53 @@ def compute_p2p_math(capital, tasa_venta, tasa_compra, ciclos_dia,
 
 @api_view(['POST'])
 def calculate_p2p(request):
+    capital = request.data.get('capital')
+    tasa_venta = request.data.get('tasa_venta')
+    tasa_compra = request.data.get('tasa_compra')
+    ciclos_dia = request.data.get('ciclos_dia', 1)
+    tipo_operativa = request.data.get('tipo_operativa', 'USD')
+    comision_compra = request.data.get('comision_compra', 0.35)
+    comision_venta = request.data.get('comision_venta', 0.35)
+
+    # Validate required fields present
+    if None in [capital, tasa_venta, tasa_compra]:
+        return Response(
+            {"error": "Campos obligatorios faltantes (capital, tasa_venta, tasa_compra)"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Validate types are numeric
     try:
-        capital = request.data.get('capital')
-        tasa_venta = request.data.get('tasa_venta')
-        tasa_compra = request.data.get('tasa_compra')
-        ciclos_dia = request.data.get('ciclos_dia', 1)
-        tipo_operativa = request.data.get('tipo_operativa', 'USD')
-        comision_compra = request.data.get('comision_compra', 0.35)
-        comision_venta = request.data.get('comision_venta', 0.35)
-        
-        if None in [capital, tasa_venta, tasa_compra]:
-            return Response(
-                {"error": "Campos obligatorios faltantes (capital, tasa_venta, tasa_compra)"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-            
+        capital = float(capital)
+        tasa_venta = float(tasa_venta)
+        tasa_compra = float(tasa_compra)
+        ciclos_dia = int(ciclos_dia)
+        comision_compra = float(comision_compra)
+        comision_venta = float(comision_venta)
+    except (TypeError, ValueError):
+        return Response(
+            {"error": "Todos los valores numericos deben ser numeros validos"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Validate ranges
+    errors = []
+    if capital <= 0:
+        errors.append("capital debe ser mayor a 0")
+    if tasa_venta <= 0:
+        errors.append("tasa_venta debe ser mayor a 0")
+    if tasa_compra <= 0:
+        errors.append("tasa_compra debe ser mayor a 0")
+    if ciclos_dia <= 0:
+        errors.append("ciclos_dia debe ser mayor a 0")
+    if not (0 <= comision_compra <= 100):
+        errors.append("comision_compra debe estar entre 0 y 100")
+    if not (0 <= comision_venta <= 100):
+        errors.append("comision_venta debe estar entre 0 y 100")
+    if errors:
+        return Response({"error": "; ".join(errors)}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
         results = compute_p2p_math(
             capital=capital, tasa_venta=tasa_venta, tasa_compra=tasa_compra,
             ciclos_dia=ciclos_dia, tipo_operativa=tipo_operativa,
@@ -110,8 +142,16 @@ def calculate_p2p(request):
             comision_venta=comision_venta
         )
         return Response(results, status=status.HTTP_200_OK)
+    except ZeroDivisionError:
+        return Response(
+            {"error": "tasa_compra no puede ser cero"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
     except Exception as e:
-        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {"error": "Error en el calculo"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
 
 class CalculationViewSet(viewsets.ModelViewSet):
@@ -314,18 +354,21 @@ class TransactionViewSet(viewsets.ModelViewSet):
 def get_bcv_rate(request):
     """
     Scrapes the official BCV website for the USD rate.
+    Tries SSL verification first; falls back to unverified if BCV cert fails.
     """
     import requests
-    import urllib3
     from bs4 import BeautifulSoup
-    
-    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
     
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     }
     try:
+        response = requests.get('https://www.bcv.org.ve/', headers=headers, verify=True, timeout=15)
+    except requests.exceptions.SSLError:
+        import urllib3
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
         response = requests.get('https://www.bcv.org.ve/', headers=headers, verify=False, timeout=15)
+    try:
         response.raise_for_status()
         soup = BeautifulSoup(response.content, 'html.parser')
         dolar_div = soup.find('div', id='dolar')

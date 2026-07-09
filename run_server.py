@@ -40,7 +40,7 @@ settings.STATIC_ROOT = str(BASE_DIR / 'staticfiles')
 settings.DEBUG = False
 settings.ALLOWED_HOSTS = ['*']
 settings.CORS_ALLOWED_ORIGINS = []
-settings.CORS_ALLOW_ALL_ORIGINS = True
+settings.CORS_ALLOW_ALL_ORIGINS = False
 
 django.setup()
 

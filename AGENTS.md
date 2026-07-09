@@ -78,7 +78,7 @@ No test runner or typecheck script configured for frontend (no vitest, no tsc --
 - **`get_bcv_rate` uses `verify=False`** (HTTPS without cert verification) — BCV site requires this.
 - **`reset_database`** endpoint is destructive and unprotected — no auth required.
 - **P2P math is duplicated**: `compute_p2p_math` in `calculator/views.py:14` and `performLocalCalculations` in `frontend/src/api.ts:37`. Keep both in sync if changing formulas.
-- **Portable .exe mode**: `run_server.py` is the entry point. Uses waitress to serve Django + frontend. `spa_view.py` serves the React build. PyInstaller spec bundles everything into one .exe.
+- **Portable .exe mode**: `run_server.py` is the entry point. Uses waitress to serve Django + frontend. SPA middleware serves the React build inline. PyInstaller spec bundles everything into one .exe.
 - **All monetary values are floats** (Django FloatField), not Decimal. Precision issues possible.
 - **No test suite** for frontend. Backend has `calculator/tests.py` (check if populated).
 

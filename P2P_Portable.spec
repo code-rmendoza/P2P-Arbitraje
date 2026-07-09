@@ -112,8 +112,6 @@ django_imports = [
     'p2p_project.settings',
     'p2p_project.urls',
     'p2p_project.wsgi',
-    'p2p_project.spa_view',
-    'p2p_project.portable_urls',
     'waitress',
     'bs4',
     'urllib3',
