@@ -1,4 +1,5 @@
-export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+const isDev = import.meta.env.DEV;
+export const API_BASE_URL = import.meta.env.VITE_API_URL || (isDev ? 'http://localhost:8000/api' : '/api');
 
 declare global {
   interface Window {
