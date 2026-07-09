@@ -54,9 +54,10 @@ async function fetchTokenFromServer(): Promise<string | null> {
     const resp = await fetch(`${API_BASE_URL}/auth-token/`);
     if (resp.ok) {
       const data = await resp.json();
-      _authToken = data.token;
-      storeToken(_authToken);
-      return _authToken;
+      const token: string = data.token;
+      _authToken = token;
+      storeToken(token);
+      return token;
     }
   } catch { /* offline */ }
   return null;
