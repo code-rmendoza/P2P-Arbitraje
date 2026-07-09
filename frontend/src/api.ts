@@ -676,6 +676,17 @@ export async function checkUpdate(): Promise<UpdateInfo | null> {
   }
 }
 
+export async function fetchVersion(): Promise<string | null> {
+  try {
+    const resp = await authFetch(`${API_BASE_URL}/version/`);
+    if (resp.ok) {
+      const data = await resp.json();
+      return data.version || null;
+    }
+  } catch { /* offline */ }
+  return null;
+}
+
 export async function applyUpdate(): Promise<{ success: boolean; message: string; new_version: string } | null> {
   try {
     const response = await authFetch(`${API_BASE_URL}/update-apply/`, { method: 'POST' });

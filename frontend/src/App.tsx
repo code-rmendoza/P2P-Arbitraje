@@ -38,7 +38,8 @@ import {
   fetchBcvRate,
   resetDatabaseSecure,
   checkUpdate,
-  applyUpdate
+  applyUpdate,
+  fetchVersion
 } from './api';
 import type { SavedCalculation, CalculationInput, DailyLog, Wallet, Transaction, UpdateInfo } from './api';
 let globalSyncLock = false;
@@ -51,6 +52,7 @@ function App() {
   const [isOnline, setIsOnline] = useState<boolean>(true);
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   const [updating, setUpdating] = useState<boolean>(false);
+  const [currentVersion, setCurrentVersion] = useState<string>('');
   
   // Calculator 1 State (Operativa Completa)
   const [capital, setCapital] = useState<number>(0);
@@ -252,6 +254,11 @@ function App() {
     checkUpdate().then(info => {
       if (info?.update_available) setUpdateInfo(info);
     }).catch(() => {});
+  }, []);
+
+  // Fetch current version on mount
+  useEffect(() => {
+    fetchVersion().then(v => { if (v) setCurrentVersion(v); }).catch(() => {});
   }, []);
 
   const handleApplyUpdate = async () => {
@@ -1179,7 +1186,7 @@ Ganancia Proyectada al Mes: $${calculationResult.ganancia_mensual.toFixed(2)} US
           <ArrowRightLeft className="logo-icon" />
           <h1 className="logo-text">
             P2P Arbitrage
-            <span className="logo-badge">V1.1</span>
+            <span className="logo-badge">{currentVersion ? `V${currentVersion}` : ''}</span>
           </h1>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>

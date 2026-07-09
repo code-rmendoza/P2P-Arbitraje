@@ -704,3 +704,15 @@ def get_auth_token(request):
         return Response({'error': 'Solo accesible desde localhost'}, status=403)
     token = _get_secret_token()
     return Response({'token': token})
+
+
+@api_view(['GET'])
+def get_version(request):
+    """
+    Returns the current app version from version.json.
+    """
+    data_dir = _get_data_dir()
+    v = load_json(data_dir / 'version.json', None)
+    if v is None:
+        v = load_json(Path(__file__).resolve().parent.parent.parent / 'version.json', {})
+    return Response({'version': v.get('version', '0.0.0')})
