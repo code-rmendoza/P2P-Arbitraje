@@ -73,7 +73,7 @@ function App() {
       } catch { /* ignore */ }
     };
     autoFetchBcv();
-    const interval = setInterval(() => appData.loadData(tasaBcv), 10000);
+    const interval = setInterval(() => appData.loadData(tasaBcv), 30000);
     return () => clearInterval(interval);
   }, []);
 

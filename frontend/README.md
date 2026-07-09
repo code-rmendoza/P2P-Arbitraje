@@ -1,32 +1,48 @@
-# React + TypeScript + Vite
+# Frontend - P2P Arbitrage Calculator
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+React 19 + TypeScript + Vite 8 + pnpm.
 
-Currently, two official plugins are available:
+## Development
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+pnpm install
+pnpm dev          # http://localhost:5173 (proxies /api to localhost:8000)
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+## Build
+
+```bash
+pnpm build        # Output: dist/
+pnpm lint         # oxlint (not eslint)
+```
+
+## Structure
+
+```
+src/
+  api.ts              # API layer with localStorage fallback
+  App.tsx             # Main orchestrator (~300 lines)
+  hooks/
+    useAppData.ts     # Data fetching, sync, online status
+    useCalculator.ts  # Calculator state and operations
+    usePortfolio.ts   # Wallets, transactions, ledger
+    useLogbook.ts     # Calendar, logs, day operations
+  components/
+    OperativeTab.tsx      # Calculator form and results
+    BuyPricesTab.tsx      # Buy price calculator
+    LogbookTab.tsx        # Calendar grid
+    PortfolioTab.tsx      # Wallets, transactions, ledger
+    TaxesTab.tsx          # Fiscal estimation (ISLR)
+    HistorySidebar.tsx    # Saved simulations sidebar
+    SaveSimulationModal.tsx
+    WalletModal.tsx
+    CloseOperativeModal.tsx
+    LogDayModal.tsx
+```
+
+## Key Decisions
+
+- **No routing library** - tab-based navigation via state
+- **No state management library** - all state in App via useState/useEffect
+- **Offline-first** - every API function has a localStorage fallback
+- **Linter: oxlint** - not eslint. Config at `.oxlintrc.json`
