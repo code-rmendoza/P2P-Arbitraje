@@ -2,7 +2,7 @@
 
 ## Project
 
-P2P Arbitrage calculator and portfolio tracker for Venezuela. Backend: Django 6 + DRF + SQLite. Frontend: React 19 + TypeScript 6 + Vite 8 + pnpm.
+P2P Arbitrage calculator and portfolio tracker for Venezuela. Backend: Django 6 + DRF + SQLite (precise Decimal arithmetic). Frontend: React 19 + TypeScript 6 + Vite 8 + pnpm (modular hooks architecture, stylesheet-driven styles).
 
 ## Quick Start
 
@@ -45,8 +45,9 @@ No test runner or typecheck script configured for frontend (no vitest, no tsc --
 
 - Single Django app: `calculator/`
 - REST API mounted at `api/` (`p2p_project/urls.py:22`)
-- CORS configured for localhost:5173 and :5174
 - SQLite database at `backend/db.sqlite3`
+- Configured Ruff and Black settings inside `backend/pyproject.toml`
+- View layers modularized inside sub-package `calculator/views/` (calculations.py, portfolio.py, logs.py, system.py)
 
 **Models** (`calculator/models.py`):
 - `Calculation` — saved simulation results (read-only computed fields)
@@ -55,16 +56,20 @@ No test runner or typecheck script configured for frontend (no vitest, no tsc --
 - `Transaction` — wallet-to-wallet movements; create atomically updates balances; editing blocked (405); delete reverses balances
 
 **Key endpoints** (`calculator/urls.py`):
-- `POST api/calculate/` — stateless P2P math
-- `GET api/bcv-rate/` — scrapes BCV website for USD rate
-- `POST api/reset-db/` — destructive: wipes all tables
+- `POST api/calculate/` — stateless P2P math using Decimal values
+- `GET api/bcv-rate/` — scrapes BCV website for USD rate with a 6-hour disk caching system
+- `POST api/reset-db/` — destructive: wipes all tables in a safe, transaction-bound sequence (requires Bearer token authentication)
 - CRUD: `api/history/`, `api/logs/`, `api/wallets/`, `api/transactions/`
 
 ### Frontend (`frontend/`)
 
-- Single-file app: `src/App.tsx` (~1700 lines)
-- API layer: `src/api.ts` — typed fetch wrappers with localStorage fallback
-- No routing library; tab-based navigation (operative, buy_prices, logbook, portfolio, taxes)
+- Modularized state management: split `usePortfolio` logic into single-responsibility custom hooks:
+  - `src/hooks/useLedger.ts` — Ledger table states, filters, limits
+  - `src/hooks/useTransactionForm.ts` — Transaction form actions
+  - `src/hooks/useWalletForm.ts` — Wallet creation/editing modals
+  - `src/hooks/usePortfolio.ts` — acts as the orchestrator facade
+- API layer: `src/api/` — split into specific modules (wallets.ts, transactions.ts, logs.ts, calculations.ts, client.ts) with active error propagation (throws true HTTP errors) and TypeError local fallback
+- Layout: Components are styled using CSS classes defined in `src/index.css` (no inline style objects)
 - Linter: oxlint (not eslint) — config at `.oxlintrc.json`
 - Build: `tsc -b && vite build`
 
@@ -72,44 +77,43 @@ No test runner or typecheck script configured for frontend (no vitest, no tsc --
 
 - **Transactions are immutable after create**: `TransactionViewSet.update` returns 405. Must delete and recreate.
 - **Transaction delete reverses wallet balances** — atomic with delete in a DB transaction.
-- **Wallet deduplication**: serializer upserts on (name, platform, currency) match. Frontend normalizes same.
-- **DailyLog accumulation**: when `accumulate: true`, matching logs on same date+type+method are merged (additive).
+- **Unique Wallet constraints**: Unique together constraint on `(name, platform, currency)`. Serializer create enforces it directly via DB validations, returning `400 Bad Request` if duplicate.
+- **DailyLog accumulation**: when `accumulate: true` on log creation, backend locks the database row (`select_for_update`) and accumulates profit, volume, and comments inside an atomic transaction block.
 - **Offline mode**: every API function has a localStorage fallback. `isOnline` state toggles the badge.
-- **`get_bcv_rate` uses `verify=False`** (HTTPS without cert verification) — BCV site requires this.
-- **`reset_database`** endpoint is destructive and unprotected — no auth required.
-- **P2P math is duplicated**: `compute_p2p_math` in `calculator/views.py:14` and `performLocalCalculations` in `frontend/src/api.ts:37`. Keep both in sync if changing formulas.
-- **Portable .exe mode**: `run_server.py` is the entry point. Uses waitress to serve Django + frontend. SPA middleware serves the React build inline. PyInstaller spec bundles everything into one .exe.
-- **All monetary values are floats** (Django FloatField), not Decimal. Precision issues possible.
-- **No test suite** for frontend. Backend has `calculator/tests.py` (check if populated).
+- **`get_bcv_rate` caching**: Caches scraped rate in `bcv_rate_cache.json` for 6 hours. If scraping fails (connection issues, SSL errors, HTML changes), it falls back to expired cached rate or a hardcoded contingency rate of `36.50`.
+- **Timing attack protection**: Authentication comparison uses `hmac.compare_digest` to prevent timing side-channel attacks.
+- **Secure Token injection**: `run_server.py` in production Waitress mode automatically injects `window.__P2P_TOKEN__` script block into `index.html` on delivery, removing bootstrap auth token network calls.
+- **Precision**: All financial view backend calculations are done using Python's `Decimal` class, avoiding float precision errors. Redundant calculations unifications done via client-side `currency.ts amountToUsdt` and backend views.
+- **No test suite** for frontend. Backend has `calculator/tests.py` containing 22 tests (covers update hash checking, timing checks, constraints, log accumulation, and BCV fallbacks).
 
 ## Auto-Update System
 
 The portable .exe checks for updates on startup via GitHub Releases.
 
 **Config files:**
-- `version.json` — local version (e.g. `{"version": "1.0.0"}`). Bump before each release.
+- `version.json` — local version (e.g. `{"version": "2.1.0"}`). Bump before each release.
 - `release_config.json` — GitHub repo: `{"owner": "code-rmendoza", "repo": "P2P-Arbitraje"}`
 - `update_state.json` — generated at runtime next to the .exe. Tracks daily API call count.
 
-**Rate limiting:** Max 10 GitHub API calls per day. Counter resets at midnight. Stored in `update_state.json`.
+**Integrity Verification (SHA-256):**
+During updates, the system downloads both the `P2P_Arbitrage.zip` and `P2P_Arbitrage.zip.sha256` files. It computes the SHA-256 checksum of the local ZIP and compares it to the remote hash. If they mismatch or the hash signature is missing, the updater deletes the temporary files and halts.
 
 **Update flow:**
 1. On startup, check internet connectivity (socket to 1.1.1.1:53)
 2. If online and checks_today < 10: query `https://api.github.com/repos/{owner}/{repo}/releases/latest`
-3. Compare tag (e.g. `v1.1.0`) with local `version.json` version
+3. Compare tag (e.g. `v2.1.0`) with local `version.json` version
 4. If newer: prompt user for confirmation in console
-5. If accepted: download .zip to temp, generate `updater.ps1`, launch it, exit
-6. `updater.ps1` waits for process to exit, replaces files (preserves db.sqlite3), relaunches .exe
+5. If accepted: download ZIP and SHA-256 signature to temp, verify integrity hash
+6. If valid: generate `updater.ps1`, launch it, exit
+7. `updater.ps1` replaces files (preserves db.sqlite3 and update_state.json), relaunches .exe
 
 **To release a new version:**
-1. Bump `version.json` (e.g. `1.0.0` → `1.1.0`)
+1. Bump `version.json` (e.g. `2.1.0` → `2.2.0`)
 2. Run `build.bat`
-3. Compress `backend\dist\P2P_Arbitrage\` into .zip
-4. Create GitHub Release with tag `v1.1.0`, upload the .zip
-
-**Files excluded from update:**
-- `db.sqlite3` (user data preserved)
-- `update_state.json` (rate limit state preserved)
+3. Compress `backend\dist\P2P_Arbitrage\` into `P2P_Arbitrage.zip`
+4. Calculate SHA-256 of the ZIP and save it in `P2P_Arbitrage.zip.sha256`
+5. Create GitHub Release with tag `v2.2.0`, upload the ZIP and SHA-256 signature
+6. Delete temporary folders (`backend/build/` and `backend/dist/`) locally
 
 ## Conventions
 
