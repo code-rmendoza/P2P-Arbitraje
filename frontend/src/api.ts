@@ -52,6 +52,8 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
 }
 
 // Unified calculations logic (supports USD and VES)
+// DUPLICATED: Also implemented in backend/calculator/views.py:compute_p2p_math
+// Keep both in sync if changing formulas. This copy enables offline mode.
 export function performLocalCalculations(input: CalculationInput): CalculationResult {
   const K = input.capital;
   const Cb = input.comision_compra / 100;

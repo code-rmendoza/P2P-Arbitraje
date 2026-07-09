@@ -55,6 +55,8 @@ class RequireAuthForDestructive(BasePermission):
 def compute_p2p_math(capital, tasa_venta, tasa_compra, ciclos_dia, 
                      tipo_operativa='USD',
                      comision_compra=0.35, comision_venta=0.35):
+    # DUPLICATED: Also implemented in frontend/src/api.ts:performLocalCalculations
+    # Keep both in sync if changing formulas. Frontend copy enables offline mode.
     K = float(capital)
     Cb = float(comision_compra) / 100.0
     Cs = float(comision_venta) / 100.0
@@ -673,7 +675,8 @@ Remove-Item -Path $PSCommandPath -Force -ErrorAction SilentlyContinue
     def shutdown_server():
         import time
         time.sleep(2)
-        os._exit(0)
+        import sys
+        sys.exit(0)
 
     threading.Thread(target=shutdown_server, daemon=True).start()
 
@@ -688,9 +691,16 @@ Remove-Item -Path $PSCommandPath -Force -ErrorAction SilentlyContinue
 def get_auth_token(request):
     """
     Returns the secret token. Only accessible from localhost.
+    Validates both REMOTE_ADDR and Host header.
     """
-    host = request.META.get('REMOTE_ADDR', '')
-    if host not in ('127.0.0.1', '::1', 'localhost'):
+    remote_addr = request.META.get('REMOTE_ADDR', '')
+    host_header = request.META.get('HTTP_HOST', '')
+    valid_hosts = ('127.0.0.1', '::1', 'localhost')
+    
+    addr_ok = remote_addr in valid_hosts
+    host_ok = any(h in host_header for h in valid_hosts) or host_header.startswith('localhost:')
+    
+    if not (addr_ok and host_ok):
         return Response({'error': 'Solo accesible desde localhost'}, status=403)
     token = _get_secret_token()
     return Response({'token': token})

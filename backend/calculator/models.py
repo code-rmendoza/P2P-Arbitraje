@@ -31,7 +31,7 @@ class Calculation(models.Model):
     ganancia_mensual = models.DecimalField(max_digits=14, decimal_places=2)
     tasa_minima_compra = models.DecimalField(max_digits=12, decimal_places=4)
     
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
 
     class Meta:
         ordering = ['-created_at']
@@ -41,7 +41,7 @@ class Calculation(models.Model):
 
 
 class DailyLog(models.Model):
-    date = models.DateField()
+    date = models.DateField(db_index=True)
     profit = models.DecimalField(max_digits=14, decimal_places=2, default=0.0)
     volume = models.DecimalField(max_digits=14, decimal_places=2, default=0.0)
     imported = models.BooleanField(default=False)
@@ -100,7 +100,7 @@ class Transaction(models.Model):
         ('TRANSFERENCIA', 'Transferencia'),
     ]
     
-    date = models.DateTimeField()
+    date = models.DateTimeField(db_index=True)
     type = models.CharField(max_length=20, choices=TYPE_CHOICES)
     
     wallet_from = models.ForeignKey(
