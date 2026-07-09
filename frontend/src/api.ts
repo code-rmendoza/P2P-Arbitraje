@@ -33,22 +33,52 @@ export interface SavedCalculation extends CalculationInput, CalculationResult {
 
 const API_BASE_URL = 'http://localhost:8000/api';
 
-let _authToken: string | null = null;
+const TOKEN_KEY = 'p2p_auth_token';
 
-async function getAuthHeaders(): Promise<Record<string, string>> {
-  if (!_authToken) {
-    try {
-      const resp = await fetch(`${API_BASE_URL}/auth-token/`);
-      if (resp.ok) {
-        const data = await resp.json();
-        _authToken = data.token;
-      }
-    } catch { /* offline */ }
-  }
+function getStoredToken(): string | null {
+  try { return localStorage.getItem(TOKEN_KEY); } catch { return null; }
+}
+
+function storeToken(token: string) {
+  try { localStorage.setItem(TOKEN_KEY, token); } catch { /* quota */ }
+}
+
+function clearStoredToken() {
+  try { localStorage.removeItem(TOKEN_KEY); } catch { /* ignore */ }
+}
+
+let _authToken: string | null = getStoredToken();
+
+async function fetchTokenFromServer(): Promise<string | null> {
+  try {
+    const resp = await fetch(`${API_BASE_URL}/auth-token/`);
+    if (resp.ok) {
+      const data = await resp.json();
+      _authToken = data.token;
+      storeToken(_authToken);
+      return _authToken;
+    }
+  } catch { /* offline */ }
+  return null;
+}
+
+async function authFetch(url: string, options: RequestInit = {}): Promise<Response> {
+  let headers = { ...options.headers } as Record<string, string>;
   if (_authToken) {
-    return { 'Authorization': `Bearer ${_authToken}` };
+    headers['Authorization'] = `Bearer ${_authToken}`;
   }
-  return {};
+  let resp = await fetch(url, { ...options, headers });
+  // Auto-refresh token on 401
+  if (resp.status === 401 && _authToken) {
+    clearStoredToken();
+    _authToken = null;
+    await fetchTokenFromServer();
+    if (_authToken) {
+      headers['Authorization'] = `Bearer ${_authToken}`;
+      resp = await fetch(url, { ...options, headers });
+    }
+  }
+  return resp;
 }
 
 // Unified calculations logic (supports USD and VES)
@@ -172,11 +202,7 @@ export async function saveCalculation(input: CalculationInput & { label: string 
 
 export async function deleteCalculation(id: number): Promise<void> {
   try {
-    const authHeaders = await getAuthHeaders();
-    const response = await fetch(`${API_BASE_URL}/history/${id}/`, {
-      method: 'DELETE',
-      headers: authHeaders,
-    });
+    const response = await authFetch(`${API_BASE_URL}/history/${id}/`, { method: 'DELETE' });
     if (!response.ok) throw new Error('Error al eliminar del servidor');
   } catch (error) {
     console.warn('Backend offline, eliminando simulación localmente:', error);
@@ -227,11 +253,10 @@ export async function saveLog(input: DailyLogInput): Promise<DailyLog> {
   try {
     const method = input.id ? 'PUT' : 'POST';
     const url = input.id ? `${API_BASE_URL}/logs/${input.id}/` : `${API_BASE_URL}/logs/`;
-    const authHeaders = input.id ? await getAuthHeaders() : {};
     
-    const response = await fetch(url, {
+    const response = await authFetch(url, {
       method,
-      headers: { 'Content-Type': 'application/json', ...authHeaders },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(input),
     });
     if (!response.ok) throw new Error('Error al guardar registro en el servidor');
@@ -306,11 +331,7 @@ export async function saveLog(input: DailyLogInput): Promise<DailyLog> {
 
 export async function deleteLog(id: number): Promise<void> {
   try {
-    const authHeaders = await getAuthHeaders();
-    const response = await fetch(`${API_BASE_URL}/logs/${id}/`, {
-      method: 'DELETE',
-      headers: authHeaders,
-    });
+    const response = await authFetch(`${API_BASE_URL}/logs/${id}/`, { method: 'DELETE' });
     if (!response.ok) throw new Error('Error al eliminar registro del servidor');
   } catch (error) {
     console.warn('Backend offline, eliminando registro localmente:', error);
@@ -433,10 +454,9 @@ export async function saveWallet(input: Omit<Wallet, 'id' | 'created_at'> & { id
   try {
     const method = input.id ? 'PUT' : 'POST';
     const url = input.id ? `${API_BASE_URL}/wallets/${input.id}/` : `${API_BASE_URL}/wallets/`;
-    const authHeaders = input.id ? await getAuthHeaders() : {};
-    const response = await fetch(url, {
+    const response = await authFetch(url, {
       method,
-      headers: { 'Content-Type': 'application/json', ...authHeaders },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(input),
     });
     if (!response.ok) throw new Error('Error al guardar billetera en el servidor');
@@ -490,11 +510,7 @@ export async function saveWallet(input: Omit<Wallet, 'id' | 'created_at'> & { id
 
 export async function deleteWallet(id: number): Promise<void> {
   try {
-    const authHeaders = await getAuthHeaders();
-    const response = await fetch(`${API_BASE_URL}/wallets/${id}/`, {
-      method: 'DELETE',
-      headers: authHeaders,
-    });
+    const response = await authFetch(`${API_BASE_URL}/wallets/${id}/`, { method: 'DELETE' });
     if (!response.ok) throw new Error('Error al eliminar billetera del servidor');
   } catch (error) {
     console.warn('Backend offline, eliminando billetera localmente:', error);
@@ -589,11 +605,7 @@ export async function saveTransaction(input: Omit<Transaction, 'id' | 'created_a
 
 export async function deleteTransaction(id: number): Promise<void> {
   try {
-    const authHeaders = await getAuthHeaders();
-    const response = await fetch(`${API_BASE_URL}/transactions/${id}/`, {
-      method: 'DELETE',
-      headers: authHeaders,
-    });
+    const response = await authFetch(`${API_BASE_URL}/transactions/${id}/`, { method: 'DELETE' });
     if (!response.ok) throw new Error('Error al eliminar transacción del servidor');
   } catch (error) {
     console.warn('Backend offline, eliminando transacción localmente:', error);
@@ -665,11 +677,7 @@ export async function checkUpdate(): Promise<UpdateInfo | null> {
 
 export async function applyUpdate(): Promise<{ success: boolean; message: string; new_version: string } | null> {
   try {
-    const authHeaders = await getAuthHeaders();
-    const response = await fetch(`${API_BASE_URL}/update-apply/`, {
-      method: 'POST',
-      headers: authHeaders,
-    });
+    const response = await authFetch(`${API_BASE_URL}/update-apply/`, { method: 'POST' });
     const data = await response.json();
     if (!response.ok) return null;
     return data;
@@ -679,28 +687,13 @@ export async function applyUpdate(): Promise<{ success: boolean; message: string
 }
 
 export async function fetchAuthToken(): Promise<string | null> {
-  try {
-    const resp = await fetch(`${API_BASE_URL}/auth-token/`);
-    if (!resp.ok) return null;
-    const data = await resp.json();
-    _authToken = data.token;
-    return _authToken;
-  } catch {
-    return null;
-  }
+  return await fetchTokenFromServer();
 }
 
 export async function resetDatabaseSecure(): Promise<void> {
-  const authHeaders = await getAuthHeaders();
-  if (!Object.keys(authHeaders).length) {
-    throw new Error('No se pudo obtener token de autenticacion');
-  }
-  const response = await fetch(`${API_BASE_URL}/reset-db/`, {
-    method: 'POST',
-    headers: authHeaders,
-  });
-  if (!response.ok) {
-    const errData = await response.json().catch(() => ({}));
+  const resp = await authFetch(`${API_BASE_URL}/reset-db/`, { method: 'POST' });
+  if (!resp.ok) {
+    const errData = await resp.json().catch(() => ({}));
     throw new Error(errData.error || 'Error al restablecer la base de datos');
   }
 }
