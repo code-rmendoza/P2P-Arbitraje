@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowRightLeft, CheckCircle } from 'lucide-react';
+import { ArrowRightLeft, CheckCircle, Loader2 } from 'lucide-react';
 import { applyUpdate, fetchBcvRate, resetDatabaseSecure, saveLog } from './api';
 
 import { useAppData } from './hooks/useAppData';
@@ -23,6 +23,7 @@ function App() {
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
   const [updating, setUpdating] = useState<boolean>(false);
   const [isFetchingBcv, setIsFetchingBcv] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [tasaBcv, setTasaBcv] = useState<number>(() => {
     const local = localStorage.getItem('p2p_tasa_bcv');
     return local ? parseFloat(local) : 0;
@@ -65,7 +66,7 @@ function App() {
   );
 
   useEffect(() => {
-    appData.loadData(tasaBcv);
+    appData.loadData(tasaBcv).then(() => setIsLoading(false));
     const autoFetchBcv = async () => {
       try {
         const rate = await fetchBcvRate();
@@ -211,6 +212,17 @@ function App() {
 
   return (
     <div className="app-container">
+      {isLoading && (
+        <div style={{
+          position: 'fixed', inset: 0, backgroundColor: 'var(--bg-app)',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          zIndex: 9999, gap: '1rem',
+        }}>
+          <Loader2 style={{ width: '2.5rem', height: '2.5rem', color: 'var(--color-primary)', animation: 'spin 1s linear infinite' }} />
+          <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>Cargando datos...</span>
+        </div>
+      )}
+
       {notification && (
         <div style={{
           position: 'fixed', bottom: '2rem', right: '2rem',

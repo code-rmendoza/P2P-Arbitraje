@@ -1,6 +1,7 @@
-import { WalletCards, Plus, Info, Edit3, X, Trash2, ArrowRight, CheckCircle } from 'lucide-react';
+import { WalletCards, Plus, Info, Edit3, X, Trash2, ArrowRight, CheckCircle, FileDown } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import type { Wallet, Transaction } from '../api';
+import { exportPortfolioPDF } from '../api/pdf';
 
 interface PortfolioTabProps {
   wallets: Wallet[];
@@ -158,6 +159,13 @@ export function PortfolioTab({
           Saldos reales por billetera y movimientos de doble entrada.
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <button className="btn btn-secondary" onClick={() => exportPortfolioPDF({
+            wallets, transactions: displayedTransactions, totalUsdt: totalPortfolioUsdt,
+            profitUsdt: realPortfolioProfitUsdt, profitPct: realPortfolioProfitPct, tasaBcv,
+          })} title="Exportar portafolio a PDF" style={{ padding: '0.4rem 0.75rem', fontSize: '0.85rem', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+            <FileDown style={{ width: '0.85rem', height: '0.85rem' }} />
+            Exportar PDF
+          </button>
           <button className="btn btn-secondary" onClick={handleResetSystem} title="Restablecer base de datos" style={{ padding: '0.4rem 0.75rem', fontSize: '0.85rem', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '0.3rem', color: '#dc2626', borderColor: '#fca5a5' }}>
             <Trash2 style={{ width: '0.85rem', height: '0.85rem' }} />
             Reiniciar Sistema

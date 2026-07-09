@@ -12,6 +12,7 @@ venv/
 # Build output
 backend/dist/
 backend/build/
+backend/staticfiles/
 *.spec.bak
 
 # Database
