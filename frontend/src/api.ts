@@ -649,14 +649,6 @@ export async function fetchBcvRate(): Promise<number> {
   return data.rate;
 }
 
-export async function resetDatabase(): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/reset-db/`, { method: 'POST' });
-  if (!response.ok) {
-    const errData = await response.json().catch(() => ({}));
-    throw new Error(errData.error || 'Error al restablecer la base de datos');
-  }
-}
-
 export interface UpdateInfo {
   update_available: boolean;
   current_version: string;
