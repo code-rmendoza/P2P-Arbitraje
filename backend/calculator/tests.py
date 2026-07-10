@@ -378,6 +378,60 @@ class SecurityDevOpsTests(APITestCase):
         self.assertIn('Violacion de integridad', resp.data['error'])
 
     @patch('requests.get')
+    def test_check_update_matches_architecture(self, mock_get):
+        import struct
+        suffix = "_x64" if struct.calcsize("P") * 8 == 64 else "_x86"
+        expected_zip = f"P2P_Arbitrage{suffix}.zip"
+        
+        class MockReleaseResponse:
+            status_code = 200
+            def json(self):
+                return {
+                    "tag_name": "v9.9.9",
+                    "assets": [
+                        {
+                            "name": "P2P_Arbitrage_x86.zip",
+                            "browser_download_url": "https://github.com/code-rmendoza/P2P-Arbitraje/releases/download/v9.9.9/P2P_Arbitrage_x86.zip"
+                        },
+                        {
+                            "name": "P2P_Arbitrage_x64.zip",
+                            "browser_download_url": "https://github.com/code-rmendoza/P2P-Arbitraje/releases/download/v9.9.9/P2P_Arbitrage_x64.zip"
+                        }
+                    ]
+                }
+
+        mock_get.return_value = MockReleaseResponse()
+        
+        resp = self.client.get(reverse('update-check'))
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertTrue(resp.data['update_available'])
+        self.assertEqual(resp.data['latest_version'], '9.9.9')
+        self.assertIn(expected_zip, resp.data['download_url'])
+
+    @patch('requests.get')
+    def test_check_update_fallback_generic(self, mock_get):
+        class MockReleaseResponse:
+            status_code = 200
+            def json(self):
+                return {
+                    "tag_name": "v9.9.9",
+                    "assets": [
+                        {
+                            "name": "P2P_Arbitrage.zip",
+                            "browser_download_url": "https://github.com/code-rmendoza/P2P-Arbitraje/releases/download/v9.9.9/P2P_Arbitrage.zip"
+                        }
+                    ]
+                }
+
+        mock_get.return_value = MockReleaseResponse()
+        
+        resp = self.client.get(reverse('update-check'))
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertTrue(resp.data['update_available'])
+        self.assertEqual(resp.data['latest_version'], '9.9.9')
+        self.assertIn('P2P_Arbitrage.zip', resp.data['download_url'])
+
+    @patch('requests.get')
     def test_bcv_rate_scraping_fails_uses_fallback(self, mock_get):
         # Clean up any existing cache file first to test cold start fallback
         import os

@@ -87,18 +87,21 @@ Cuando quieras empaquetar tu código en una aplicación final autoejecutable par
     - Utiliza **PyInstaller** para empaquetar el servidor Python y todas sus dependencias en un ejecutable portable.
     - Copia el frontend compilado y los archivos de versión dentro del directorio final de distribución: `backend/dist/P2P_Arbitrage/`.
 
-El ejecutable final se genera en:
-📂 `backend\dist\P2P_Arbitrage\P2P_Arbitrage.exe`
+El ejecutable final se genera en la subcarpeta correspondiente a la arquitectura de tu entorno de Python actual:
+*   Para 64 bits (x64): 📂 `backend\dist\P2P_Arbitrage_x64\P2P_Arbitrage.exe`
+*   Para 32 bits (x86): 📂 `backend\dist\P2P_Arbitrage_x86\P2P_Arbitrage.exe`
+
+El script `build.bat` detecta automáticamente qué arquitectura de Python está activa en tu consola para organizar los archivos en su subcarpeta respectiva.
 
 ---
 
 ## 4. Guía Detallada para Publicar una Nueva Versión (Releases)
 
-El software cuenta con un sistema de **actualización automática** (Auto-Update). Al iniciar, el ejecutable consulta las últimas publicaciones del repositorio en GitHub. Para subir una actualización de forma correcta sin romper este sistema, debes seguir meticulosamente estos pasos:
+El software cuenta con un sistema de **actualización automática** (Auto-Update). Al iniciar, el ejecutable consulta las últimas publicaciones del repositorio en GitHub, detecta la arquitectura del proceso actual (32 bits o 64 bits) y descarga el ZIP correspondiente. Para subir una actualización de forma correcta sin romper este sistema, debes seguir meticulosamente estos pasos:
 
-### Explicación Sencilla: ¿Por qué hay un archivo ZIP y un archivo SHA256?
-*   `P2P_Arbitrage.zip`: Es la carpeta comprimida del software compilado.
-*   `P2P_Arbitrage.zip.sha256`: Es una firma digital de seguridad. Contiene una clave única alfanumérica basada en el contenido exacto del ZIP. Al descargar la actualización, el ejecutable compara el hash del ZIP descargado contra este archivo. Si coinciden, procede; si no, aborta. Esto evita descargas corruptas o ataques maliciosos de terceros.
+### Explicación Sencilla: ¿Por qué hay archivos ZIP y SHA256 para cada arquitectura?
+*   `P2P_Arbitrage_x64.zip` y `P2P_Arbitrage_x86.zip`: Son los paquetes del software compilados en 64 y 32 bits respectivamente.
+*   `P2P_Arbitrage_x64.zip.sha256` y `P2P_Arbitrage_x86.zip.sha256`: Son firmas digitales de seguridad de cada paquete. Al descargar la actualización, el ejecutable del cliente calcula el hash de su ZIP correspondiente y lo compara contra esta firma. Si coinciden, procede; si no, cancela la instalación para prevenir descargas incompletas o modificaciones maliciosas.
 
 ### Paso 1: Incrementar el Número de Versión
 Abre el archivo `version.json` en la raíz del proyecto y cambia el número de versión (por ejemplo, de `2.1.0` a `2.2.0`):
@@ -108,32 +111,32 @@ Abre el archivo `version.json` en la raíz del proyecto y cambia el número de v
 }
 ```
 
-### Paso 2: Ejecutar la Compilación
-Ejecuta en tu terminal el script de compilación para generar los binarios frescos con la nueva versión:
+### Paso 2: Ejecutar la Compilación y Empaquetado Automático
+Abre una terminal de comandos en la raíz del proyecto y ejecuta:
 ```cmd
 build.bat
 ```
 
-### Paso 3: Empaquetar y Generar la Firma Digital
-Para preparar los archivos del lanzamiento, abre una terminal de **PowerShell** en la raíz del proyecto y ejecuta secuencialmente:
+**¿Qué hace este script de forma automatizada?**
+1.  Instala las dependencias y PyInstaller en tus entornos de Python de 64 y 32 bits usando el lanzador de Windows (`py.exe`).
+2.  Construye los recursos optimizados del frontend y recopila los archivos estáticos de Django.
+3.  Compila los ejecutables portables tanto para 64 bits (`x64`) como para 32 bits (`x86`).
+4.  Comprime ambas versiones en archivos ZIP (`P2P_Arbitrage_x64.zip` y `P2P_Arbitrage_x86.zip`).
+5.  Calcula y genera las firmas de integridad SHA-256 (`.sha256`) para cada ZIP.
+6.  Genera copias retrocompatibles (`P2P_Arbitrage.zip` y su `.sha256`) para que clientes que vengan de versiones antiguas (v2.1.0) puedan actualizarse automáticamente sin problemas.
 
-1.  **Comprimir el ejecutable compilado en un archivo ZIP**:
-    ```powershell
-    Compress-Archive -Path "backend\dist\P2P_Arbitrage\*" -DestinationPath "backend\dist\P2P_Arbitrage.zip" -Force
-    ```
-2.  **Generar la firma criptográfica SHA-256**:
-    ```powershell
-    $hash = (Get-FileHash -Path "backend\dist\P2P_Arbitrage.zip" -Algorithm SHA256).Hash.ToLower()
-    "$hash  P2P_Arbitrage.zip" | Out-File -FilePath "backend\dist\P2P_Arbitrage.zip.sha256" -Encoding ascii
-    ```
+Todos los archivos resultantes se guardarán listos en la carpeta:
+📂 `backend\dist\`
 
-### Paso 4: Crear y Subir el Lanzamiento a GitHub
+---
+
+### Paso 3: Crear y Subir el Lanzamiento a GitHub
 Puedes hacer esto de dos maneras (elige la que prefieras):
 
 #### Opción A: A través de la Consola (Recomendado y rápido)
 Si tienes el CLI de GitHub (`gh`) instalado y autenticado, ejecuta:
 ```bash
-gh release create v2.2.0 backend\dist\P2P_Arbitrage.zip backend\dist\P2P_Arbitrage.zip.sha256 --title "v2.2.0" --notes "Notas del release v2.2.0 - Describe tus cambios aquí"
+gh release create v2.2.0 backend\dist\P2P_Arbitrage_x64.zip backend\dist\P2P_Arbitrage_x64.zip.sha256 backend\dist\P2P_Arbitrage_x86.zip backend\dist\P2P_Arbitrage_x86.zip.sha256 backend\dist\P2P_Arbitrage.zip backend\dist\P2P_Arbitrage.zip.sha256 --title "v2.2.0" --notes "Notas del release v2.2.0 - Describe tus cambios aquí"
 ```
 
 #### Opción B: A través de la Página Web de GitHub
@@ -141,16 +144,22 @@ gh release create v2.2.0 backend\dist\P2P_Arbitrage.zip backend\dist\P2P_Arbitra
 2.  Haz clic en **"Releases"** en la barra lateral derecha y luego en **"Draft a new release"**.
 3.  Crea un nuevo tag (etiqueta) escribiendo exactamente **`v2.2.0`** (con la letra "v" minúscula al inicio).
 4.  Escribe el título del lanzamiento (ej. `v2.2.0`) y describe brevemente los cambios realizados.
-5.  En la sección de arrastrar archivos (*Attach binaries by dropping them here*), sube **obligatoriamente** ambos archivos ubicados en tu disco duro:
-    *   📂 `backend\dist\P2P_Arbitrage.zip`
-    *   📂 `backend\dist\P2P_Arbitrage.zip.sha256`
+5.  En la sección de arrastrar archivos (*Attach binaries by dropping them here*), sube **obligatoriamente** los seis archivos ubicados en `backend\dist\`:
+    *   📂 `P2P_Arbitrage_x64.zip`
+    *   📂 `P2P_Arbitrage_x64.zip.sha256`
+    *   📂 `P2P_Arbitrage_x86.zip`
+    *   📂 `P2P_Arbitrage_x86.zip.sha256`
+    *   📂 `P2P_Arbitrage.zip`
+    *   📂 `P2P_Arbitrage.zip.sha256`
 6.  Haz clic en **"Publish Release"**.
 
-### Paso 5: Limpieza de Archivos Locales Temporales
-Para no ocupar espacio innecesario en tu disco local con archivos binarios duplicados temporales, ejecuta el siguiente comando en la raíz para borrarlos de tu computadora (no te preocupes, ya están guardados seguros en GitHub):
+### Paso 4: Limpieza de Archivos Locales Temporales
+Para no ocupar espacio innecesario en tu disco local con archivos binarios duplicados temporales, ejecuta el siguiente comando en PowerShell en la raíz para borrar las carpetas descomprimidas (no te preocupes, los ZIP y las firmas ya están creados en `backend/dist`):
 ```powershell
 Remove-Item -Path "backend/build" -Recurse -Force -ErrorAction SilentlyContinue
-Remove-Item -Path "backend/dist" -Recurse -Force -ErrorAction SilentlyContinue
+Remove-Item -Path "backend/dist/P2P_Arbitrage_x64" -Recurse -Force -ErrorAction SilentlyContinue
+Remove-Item -Path "backend/dist/P2P_Arbitrage_x86" -Recurse -Force -ErrorAction SilentlyContinue
+```
 ```
 
 ### Paso 6: Sincronizar el Cambio de Versión en Git

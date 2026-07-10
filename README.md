@@ -99,8 +99,7 @@ manual_implementacion_y_release.md # Guía detallada para Juniors y Releases
 
 Para crear e implementar un nuevo release de forma correcta:
 1.  Actualizar la versión en `version.json` (ej: `2.1.0` -> `2.2.0`).
-2.  Ejecutar el script `build.bat` en la consola.
-3.  Comprimir y firmar los binarios en un ZIP y generar su firma digital `.sha256` en PowerShell.
-4.  Subir ambos archivos (`.zip` y `.zip.sha256`) a la sección de Releases de GitHub con el tag coincidente (ej: `v2.2.0`).
+2.  Ejecutar el script `build.bat` en la consola para compilar, comprimir y firmar automáticamente ambas arquitecturas (x86 y x64).
+3.  Subir los seis archivos generados en `backend/dist/` (`_x64.zip`, `_x86.zip`, `P2P_Arbitrage.zip` y sus correspondientes firmas `.sha256`) a la sección de Releases de GitHub con el tag coincidente (ej: `v2.2.0`).
 
 Para ver los comandos de consola exactos y el manual paso a paso de este flujo, consulta el archivo [manual_implementacion_y_release.md](file:///c:/Users/Usuario/Desktop/Proyectos/P2P/manual_implementacion_y_release.md).

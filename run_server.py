@@ -170,12 +170,26 @@ def check_for_update():
         data = resp.json()
         tag = data.get("tag_name", "")
         assets = data.get("assets", [])
+
+        # Detect active Python architecture/bitness
+        import struct
+        is_64bit = struct.calcsize("P") * 8 == 64
+        arch_suffix = "_x64" if is_64bit else "_x86"
+        expected_zip = f"P2P_Arbitrage{arch_suffix}.zip"
+
         zip_url = None
         for asset in assets:
-            name = asset.get("name", "")
-            if name.endswith(".zip"):
+            if asset.get("name") == expected_zip:
                 zip_url = asset.get("browser_download_url")
                 break
+
+        if not zip_url:
+            # Fallback to the generic ZIP
+            for asset in assets:
+                if asset.get("name") == "P2P_Arbitrage.zip":
+                    zip_url = asset.get("browser_download_url")
+                    break
+
         return {"tag": tag, "zip_url": zip_url, "name": data.get("name", "")}
     except Exception:
         return None

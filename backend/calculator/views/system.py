@@ -211,11 +211,25 @@ def check_update(request):
         data = resp.json()
         tag = data.get("tag_name", "")
         assets = data.get("assets", [])
+        
+        # Detect active Python architecture/bitness
+        import struct
+        is_64bit = struct.calcsize("P") * 8 == 64
+        arch_suffix = "_x64" if is_64bit else "_x86"
+        expected_zip = f"P2P_Arbitrage{arch_suffix}.zip"
+
         download_url = None
         for asset in assets:
-            if asset.get("name", "").endswith(".zip"):
+            if asset.get("name") == expected_zip:
                 download_url = asset.get("browser_download_url")
                 break
+
+        if not download_url:
+            # Fallback to the generic ZIP
+            for asset in assets:
+                if asset.get("name") == "P2P_Arbitrage.zip":
+                    download_url = asset.get("browser_download_url")
+                    break
 
         remote_ver = parse_version(tag)
         local_ver = parse_version(local_version)
@@ -277,11 +291,27 @@ def apply_update(request):
         data = resp.json()
         tag = data.get("tag_name", "")
         assets = data.get("assets", [])
+        # Detect active Python architecture/bitness
+        import struct
+        is_64bit = struct.calcsize("P") * 8 == 64
+        arch_suffix = "_x64" if is_64bit else "_x86"
+        expected_zip = f"P2P_Arbitrage{arch_suffix}.zip"
+
         download_url = None
+        zip_name = ""
         for asset in assets:
-            if asset.get("name", "").endswith(".zip"):
+            if asset.get("name") == expected_zip:
                 download_url = asset.get("browser_download_url")
+                zip_name = asset.get("name")
                 break
+
+        if not download_url:
+            # Fallback to the generic ZIP
+            for asset in assets:
+                if asset.get("name") == "P2P_Arbitrage.zip":
+                    download_url = asset.get("browser_download_url")
+                    zip_name = asset.get("name")
+                    break
 
         if not download_url:
             return Response({'error': 'No se encontro archivo ZIP en la release'}, status=502)
@@ -312,12 +342,6 @@ def apply_update(request):
 
     # Cryptographic integrity validation via SHA-256 Checksum
     sha256_url = None
-    zip_name = ""
-    for asset in assets:
-        if asset.get("name", "").endswith(".zip"):
-            zip_name = asset.get("name")
-            break
-
     expected_sha256_name = zip_name + ".sha256" if zip_name else ""
     for asset in assets:
         if asset.get("name") == expected_sha256_name:
