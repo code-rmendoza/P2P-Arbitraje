@@ -92,6 +92,34 @@ class TransactionLedgerTests(APITestCase):
         self.assertEqual(self.binance.balance, 500)
         self.assertEqual(self.zinli.balance, 200)
 
+    def test_deleting_transaction_deletes_associated_daily_log(self):
+        # Create transaction via API (this automatically creates DailyLog)
+        response = self.client.post(self.url, {
+            'date': timezone.now().isoformat(),
+            'type': 'VENTA_P2P',
+            'wallet_from': self.binance.id,
+            'wallet_to': self.zinli.id,
+            'amount_out': 100,
+            'amount_in': 104,
+            'rate': 1.04,
+            'commission_pct': 0.35,
+            'notes': 'Log testing transaction',
+        }, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        tx_id = response.data['id']
+        
+        # Verify DailyLog was created
+        logs_count = DailyLog.objects.filter(notes__contains=f"[Auto-Transaccion #{tx_id}]").count()
+        self.assertEqual(logs_count, 1)
+        
+        # Delete transaction via API
+        del_response = self.client.delete(reverse('transaction-detail', args=[tx_id]))
+        self.assertEqual(del_response.status_code, status.HTTP_204_NO_CONTENT)
+        
+        # Verify DailyLog was deleted
+        logs_count_after = DailyLog.objects.filter(notes__contains=f"[Auto-Transaccion #{tx_id}]").count()
+        self.assertEqual(logs_count_after, 0)
+
     def test_wallet_filter_returns_related_transactions(self):
         Transaction.objects.create(
             date=timezone.now(),

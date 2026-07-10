@@ -33,7 +33,7 @@ export async function fetchWallets(): Promise<Wallet[]> {
       const localWallets = normalizeWallets(JSON.parse(local));
       const migratedWallets: Wallet[] = [];
       for (const wallet of localWallets) {
-        const createResponse = await fetch(`${API_BASE_URL}/wallets/`, {
+        const createResponse = await authFetch(`${API_BASE_URL}/wallets/`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

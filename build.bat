@@ -133,3 +133,18 @@ echo   [x86] P2P_Arbitrage_x86.zip y .sha256
 echo   [Fallback] P2P_Arbitrage.zip y .sha256 (copia de x64)
 echo ==========================================================
 echo.
+
+set /p clean_choice="¿Desea eliminar los archivos temporales de compilación (backend/build) y las carpetas descomprimidas (dist/P2P_*)? [S/N]: "
+if /i "%clean_choice%"=="S" (
+    echo.
+    echo Limpiando archivos temporales de compilacion...
+    if exist "backend\build" rmdir /S /Q "backend\build"
+    if exist "backend\dist\P2P_Arbitrage_x64" rmdir /S /Q "backend\dist\P2P_Arbitrage_x64"
+    if exist "backend\dist\P2P_Arbitrage_x86" rmdir /S /Q "backend\dist\P2P_Arbitrage_x86"
+    echo [OK] Carpetas temporales eliminadas. Se conservan los archivos ZIP y firmas SHA-256 para el release.
+) else (
+    echo.
+    echo [INFO] Carpetas descomprimidas conservadas en 'backend/dist' para pruebas locales del ejecutable.
+)
+echo.
+

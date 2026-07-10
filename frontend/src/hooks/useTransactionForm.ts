@@ -120,11 +120,6 @@ export function useTransactionForm(
   const handleDeleteTransaction = async (tx: Transaction, notify: (msg: string) => void) => {
     if (!tx.id || !confirm('¿Eliminar este movimiento y revertir saldos?')) return;
 
-    const targetLog = logs.find(log => log.notes.includes(`[Auto-Transaccion #${tx.id}]`));
-    if (targetLog && targetLog.id) {
-      try { await deleteLog(targetLog.id); } catch { /* ignore */ }
-    }
-
     await deleteTransaction(tx.id);
     await loadData();
     notify('Movimiento eliminado y saldos revertidos');

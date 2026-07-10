@@ -194,15 +194,27 @@ class TransactionViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         
         with db_transaction.atomic():
+            wallet_from = None
+            wallet_to = None
+            if instance.wallet_from:
+                wallet_from = Wallet.objects.select_for_update().get(pk=instance.wallet_from.pk)
+            if instance.wallet_to:
+                wallet_to = Wallet.objects.select_for_update().get(pk=instance.wallet_to.pk)
+
             # Reverse: add back to origin, subtract from destination
-            if instance.wallet_from and instance.amount_out > 0:
-                instance.wallet_from.balance += instance.amount_out
-                instance.wallet_from.save()
+            if wallet_from and instance.amount_out > 0:
+                wallet_from.balance += instance.amount_out
+                wallet_from.save(update_fields=['balance'])
             
-            if instance.wallet_to and instance.amount_in > 0:
-                instance.wallet_to.balance -= instance.amount_in
-                instance.wallet_to.save()
+            if wallet_to and instance.amount_in > 0:
+                wallet_to.balance -= instance.amount_in
+                wallet_to.save(update_fields=['balance'])
+            
+            # Atomically delete associated auto-created DailyLog
+            from calculator.models import DailyLog
+            DailyLog.objects.filter(notes__contains=f"[Auto-Transaccion #{instance.id}]").delete()
             
             instance.delete()
         
         return Response(status=status.HTTP_204_NO_CONTENT)
+

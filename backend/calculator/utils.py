@@ -6,7 +6,7 @@ from pathlib import Path
 def _get_data_dir():
     if getattr(sys, 'frozen', False):
         return Path(sys.executable).parent
-    return Path(__file__).resolve().parent.parent.parent
+    return Path(__file__).resolve().parent.parent
 
 
 def load_json(path, default=None):

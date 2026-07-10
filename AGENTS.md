@@ -37,7 +37,7 @@ Both must run simultaneously. Frontend falls back to localStorage when backend i
 | Create superuser | `python manage.py createsuperuser` |
 | Build portable .exe | `build.bat` (from project root) |
 
-No test runner or typecheck script configured for frontend (no vitest, no tsc --noEmit).
+Frontend build uses `tsc -b && vite build`. Frontend test suite runs with Vitest (`pnpm test`).
 
 ## Architecture
 
@@ -84,7 +84,7 @@ No test runner or typecheck script configured for frontend (no vitest, no tsc --
 - **Timing attack protection**: Authentication comparison uses `hmac.compare_digest` to prevent timing side-channel attacks.
 - **Secure Token injection**: `run_server.py` in production Waitress mode automatically injects `window.__P2P_TOKEN__` script block into `index.html` on delivery, removing bootstrap auth token network calls.
 - **Precision**: All financial view backend calculations are done using Python's `Decimal` class, avoiding float precision errors. Redundant calculations unifications done via client-side `currency.ts amountToUsdt` and backend views.
-- **No test suite** for frontend. Backend has `calculator/tests.py` containing 22 tests (covers update hash checking, timing checks, constraints, log accumulation, and BCV fallbacks).
+- **Frontend test suite**: Written using Vitest (`pnpm test` or `pnpm test:watch` in `frontend/`). Backend has `calculator/tests.py` containing 24 tests (covers updates, constraints, logs, fallbacks, and deletion consistency).
 
 ## Auto-Update System
 

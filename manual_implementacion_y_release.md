@@ -154,13 +154,17 @@ gh release create v2.2.0 backend\dist\P2P_Arbitrage_x64.zip backend\dist\P2P_Arb
 6.  Haz clic en **"Publish Release"**.
 
 ### Paso 4: Limpieza de Archivos Locales Temporales
-Para no ocupar espacio innecesario en tu disco local con archivos binarios duplicados temporales, ejecuta el siguiente comando en PowerShell en la raíz para borrar las carpetas descomprimidas (no te preocupes, los ZIP y las firmas ya están creados en `backend/dist`):
+Al finalizar la ejecución del script `build.bat` en el Paso 2, el sistema te preguntará interactivamente:
+`¿Desea eliminar los archivos temporales de compilación (backend/build) y las carpetas descomprimidas (dist/P2P_*)? [S/N]`
+
+* Si respondes **`S`** (Sí), el script eliminará automáticamente el directorio temporal de construcción y las carpetas descomprimidas de distribución, conservando únicamente los archivos `.zip` y las firmas `.sha256` requeridas para la publicación.
+* Si respondes **`N`** (No) o deseas hacer la limpieza de forma manual más adelante, puedes ejecutar este comando en PowerShell desde la raíz del proyecto:
 ```powershell
 Remove-Item -Path "backend/build" -Recurse -Force -ErrorAction SilentlyContinue
 Remove-Item -Path "backend/dist/P2P_Arbitrage_x64" -Recurse -Force -ErrorAction SilentlyContinue
 Remove-Item -Path "backend/dist/P2P_Arbitrage_x86" -Recurse -Force -ErrorAction SilentlyContinue
 ```
-```
+
 
 ### Paso 6: Sincronizar el Cambio de Versión en Git
 Por último, registra en el control de versiones que la versión oficial del código fue actualizada:

@@ -55,6 +55,7 @@ def get_bcv_rate(request):
     scraped_rate = None
     scraping_error = None
     
+    ssl_bypassed = False
     try:
         response = requests.get('https://www.bcv.org.ve/', headers=headers, verify=True, timeout=10)
     except requests.exceptions.SSLError:
@@ -62,6 +63,7 @@ def get_bcv_rate(request):
             import urllib3
             urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
             response = requests.get('https://www.bcv.org.ve/', headers=headers, verify=False, timeout=10)
+            ssl_bypassed = True
         except Exception as e:
             scraping_error = str(e)
     except Exception as e:
@@ -87,16 +89,22 @@ def get_bcv_rate(request):
             'rate': scraped_rate,
             'last_updated': now.isoformat()
         }
+        if ssl_bypassed:
+            new_cache['ssl_bypassed'] = True
         try:
             with open(cache_path, 'w', encoding='utf-8') as f:
                 json.dump(new_cache, f, indent=2)
         except Exception:
             pass
-        return Response({
+        res_data = {
             'rate': scraped_rate,
             'cached': False,
             'last_updated': now.isoformat()
-        })
+        }
+        if ssl_bypassed:
+            res_data['ssl_bypassed'] = True
+            res_data['warning'] = 'Tasa obtenida omitiendo la verificacion SSL del portal BCV.'
+        return Response(res_data)
 
     # 4. Scraping failed, apply contingencies
     if cache_data and 'rate' in cache_data:
@@ -145,7 +153,7 @@ def check_update(request):
     def get_data_path():
         if getattr(sys, 'frozen', False):
             return Path(sys.executable).parent
-        return Path(__file__).resolve().parent.parent.parent.parent
+        return Path(__file__).resolve().parent.parent.parent
 
     def get_base_path():
         if getattr(sys, 'frozen', False):
@@ -259,7 +267,7 @@ def apply_update(request):
     def get_data_path():
         if getattr(sys, 'frozen', False):
             return Path(sys.executable).parent
-        return Path(__file__).resolve().parent.parent.parent.parent
+        return Path(__file__).resolve().parent.parent.parent
 
     def get_base_path():
         if getattr(sys, 'frozen', False):

@@ -22,7 +22,7 @@ def get_base_path():
 def get_data_path():
     if getattr(sys, 'frozen', False):
         return Path(sys.executable).parent
-    return Path(__file__).resolve().parent
+    return Path(__file__).resolve().parent / 'backend'
 
 BASE_DIR = get_base_path()
 DATA_DIR = get_data_path()
@@ -85,12 +85,14 @@ if FRONTEND_DIST.exists():
                 with open(str(INDEX_FILE), 'rb') as f:
                     content = f.read()
                 try:
-                    from calculator.auth import _get_secret_token
-                    token = _get_secret_token()
-                    html = content.decode('utf-8', errors='ignore')
-                    injected_script = f'<script>window.__P2P_TOKEN__ = "{token}";</script></head>'
-                    html = html.replace('</head>', injected_script, 1)
-                    content = html.encode('utf-8')
+                    remote_addr = environ.get('REMOTE_ADDR', '')
+                    if remote_addr in ('127.0.0.1', '::1', 'localhost'):
+                        from calculator.auth import _get_secret_token
+                        token = _get_secret_token()
+                        html = content.decode('utf-8', errors='ignore')
+                        injected_script = f'<script>window.__P2P_TOKEN__ = "{token}";</script></head>'
+                        html = html.replace('</head>', injected_script, 1)
+                        content = html.encode('utf-8')
                 except Exception:
                     pass
                 start_response('200 OK', [('Content-Type', 'text/html'), ('Content-Length', str(len(content)))])

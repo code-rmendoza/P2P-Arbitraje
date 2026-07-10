@@ -164,6 +164,14 @@ export async function deleteTransaction(id: number): Promise<void> {
         });
         localStorage.setItem('p2p_wallets', JSON.stringify(updatedWallets));
         localStorage.setItem('p2p_transactions', JSON.stringify(txs.filter(t => t.id !== id)));
+        
+        // Also delete associated local DailyLog
+        const localLogs = localStorage.getItem('p2p_logs');
+        if (localLogs) {
+          const listLogs = JSON.parse(localLogs);
+          const filteredLogs = listLogs.filter((log: any) => !log.notes.includes(`[Auto-Transaccion #${id}]`));
+          localStorage.setItem('p2p_logs', JSON.stringify(filteredLogs));
+        }
       }
     }
   }
