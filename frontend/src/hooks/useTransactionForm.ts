@@ -1,10 +1,9 @@
 import { useState } from 'react';
-import { saveTransaction, deleteTransaction, deleteLog } from '../api';
-import type { Wallet, Transaction, DailyLog } from '../api';
+import { saveTransaction, deleteTransaction } from '../api';
+import type { Wallet, Transaction } from '../api';
 
 export function useTransactionForm(
   wallets: Wallet[],
-  logs: DailyLog[],
   loadData: () => Promise<void>
 ) {
   const [txWalletFrom, setTxWalletFrom] = useState<string>('');

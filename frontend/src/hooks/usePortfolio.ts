@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { Wallet, Transaction, DailyLog } from '../api';
+import type { Wallet, Transaction } from '../api';
 import { useWalletForm } from './useWalletForm';
 import { useTransactionForm } from './useTransactionForm';
 import { useLedger } from './useLedger';
@@ -7,14 +7,13 @@ import { useLedger } from './useLedger';
 export function usePortfolio(
   wallets: Wallet[],
   transactions: Transaction[],
-  logs: DailyLog[],
   loadData: () => Promise<void>,
 ) {
   const [portfolioDateFilter, setPortfolioDateFilter] = useState<string>('today');
 
   // Delegate logic to modularized sub-hooks
   const walletFormHook = useWalletForm(loadData);
-  const txFormHook = useTransactionForm(wallets, logs, loadData);
+  const txFormHook = useTransactionForm(wallets, loadData);
   const ledgerHook = useLedger(transactions);
 
   const activeWallets = wallets.filter(wallet => wallet.is_active);

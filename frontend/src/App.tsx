@@ -62,7 +62,6 @@ function App() {
   const portfolio = usePortfolio(
     appData.wallets,
     appData.transactions,
-    appData.logs,
     () => appData.loadData(tasaBcv),
   );
 
