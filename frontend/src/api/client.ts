@@ -59,3 +59,18 @@ export async function authFetch(url: string, options: RequestInit = {}): Promise
   }
   return resp;
 }
+
+export function formatServerError(errData: any, fallback: string): string {
+  if (!errData) return fallback;
+  if (errData.detail) return String(errData.detail);
+  if (errData.error) return String(errData.error);
+  if (typeof errData === 'object') {
+    const messages = Object.entries(errData)
+      .map(([key, val]) => {
+        const formattedVal = Array.isArray(val) ? val.join(', ') : String(val);
+        return `${key}: ${formattedVal}`;
+      });
+    if (messages.length > 0) return messages.join('\n');
+  }
+  return fallback;
+}

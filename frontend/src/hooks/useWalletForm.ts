@@ -55,8 +55,8 @@ export function useWalletForm(loadData: () => Promise<void>) {
       await saveWallet({
         id: editingWalletId ?? editingWallet?.id,
         ...walletForm,
-        balance: Number(walletForm.balance) || 0,
-        opening_balance: Number(walletForm.opening_balance) || 0,
+        balance: parseFloat(Number(walletForm.balance).toFixed(2)) || 0,
+        opening_balance: parseFloat(Number(walletForm.opening_balance).toFixed(2)) || 0,
       });
       setIsWalletModalOpen(false);
       resetWalletForm();

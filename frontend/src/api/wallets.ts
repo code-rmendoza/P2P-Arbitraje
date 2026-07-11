@@ -1,4 +1,4 @@
-import { API_BASE_URL, authFetch } from './client';
+import { API_BASE_URL, authFetch, formatServerError } from './client';
 
 export interface Wallet {
   id?: number;
@@ -58,8 +58,7 @@ export async function saveWallet(input: Omit<Wallet, 'id' | 'created_at'> & { id
     });
     if (!response.ok) {
       const errData = await response.json().catch(() => ({}));
-      const msg = errData.non_field_errors?.[0] || errData.error || 'Error al guardar billetera en el servidor';
-      throw new Error(msg);
+      throw new Error(formatServerError(errData, 'Error al guardar billetera en el servidor'));
     }
     const saved: Wallet = await response.json();
     return {

@@ -1,4 +1,4 @@
-import { API_BASE_URL, authFetch } from './client';
+import { API_BASE_URL, authFetch, formatServerError } from './client';
 import type { Wallet } from './wallets';
 
 export interface Transaction {
@@ -63,7 +63,7 @@ export async function saveTransaction(
     });
     if (!response.ok) {
       const errData = await response.json().catch(() => ({}));
-      throw new Error(errData.error || 'Error al guardar transaccion en el servidor');
+      throw new Error(formatServerError(errData, 'Error al guardar transaccion en el servidor'));
     }
     const saved: Transaction = await response.json();
     return {
