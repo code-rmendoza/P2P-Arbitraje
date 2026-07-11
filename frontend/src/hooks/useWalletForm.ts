@@ -51,16 +51,20 @@ export function useWalletForm(loadData: () => Promise<void>) {
 
   const handleSaveWallet = async (notify: (msg: string) => void) => {
     if (!walletForm.name.trim() || !walletForm.platform.trim()) return;
-    await saveWallet({
-      id: editingWalletId ?? editingWallet?.id,
-      ...walletForm,
-      balance: Number(walletForm.balance) || 0,
-      opening_balance: Number(walletForm.opening_balance) || 0,
-    });
-    setIsWalletModalOpen(false);
-    resetWalletForm();
-    await loadData();
-    notify(editingWalletId ? 'Billetera actualizada' : 'Billetera creada');
+    try {
+      await saveWallet({
+        id: editingWalletId ?? editingWallet?.id,
+        ...walletForm,
+        balance: Number(walletForm.balance) || 0,
+        opening_balance: Number(walletForm.opening_balance) || 0,
+      });
+      setIsWalletModalOpen(false);
+      resetWalletForm();
+      await loadData();
+      notify(editingWalletId ? 'Billetera actualizada' : 'Billetera creada');
+    } catch (error: any) {
+      alert(error.message || 'No se pudo guardar la billetera.');
+    }
   };
 
   const handleDeactivateWallet = async (wallet: Wallet, notify: (msg: string, type?: 'success' | 'info') => void) => {
