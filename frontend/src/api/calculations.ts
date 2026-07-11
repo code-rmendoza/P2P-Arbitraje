@@ -110,13 +110,51 @@ export async function fetchCalculations(): Promise<SavedCalculation[]> {
   try {
     const response = await fetch(`${API_BASE_URL}/history/`);
     if (!response.ok) throw new Error('Error al obtener historial del servidor');
-    return await response.json();
+    const data: SavedCalculation[] = await response.json();
+    const normalized = data.map(c => ({
+      ...c,
+      capital: Number(c.capital) || 0,
+      comision_compra: Number(c.comision_compra) || 0,
+      comision_venta: Number(c.comision_venta) || 0,
+      tasa_venta: Number(c.tasa_venta) || 0,
+      tasa_compra: Number(c.tasa_compra) || 0,
+      tasa_retorno: Number(c.tasa_retorno) || 0,
+      ciclos_dia: Number(c.ciclos_dia) || 0,
+      metodos_pago: Number(c.metodos_pago) || 0,
+      monto_venta: Number(c.monto_venta) || 0,
+      monto_compra: Number(c.monto_compra) || 0,
+      ganancia_porcentaje: Number(c.ganancia_porcentaje) || 0,
+      ganancia_ciclo: Number(c.ganancia_ciclo) || 0,
+      ganancia_diaria: Number(c.ganancia_diaria) || 0,
+      ganancia_mensual: Number(c.ganancia_mensual) || 0,
+      tasa_minima_compra: Number(c.tasa_minima_compra) || 0,
+    }));
+    localStorage.setItem('p2p_simulations', JSON.stringify(normalized));
+    return normalized;
   } catch (error) {
     if (error instanceof Error && error.name !== 'TypeError') {
       throw error;
     }
     const local = localStorage.getItem('p2p_simulations');
-    return local ? JSON.parse(local) : [];
+    const data: SavedCalculation[] = local ? JSON.parse(local) : [];
+    return data.map(c => ({
+      ...c,
+      capital: Number(c.capital) || 0,
+      comision_compra: Number(c.comision_compra) || 0,
+      comision_venta: Number(c.comision_venta) || 0,
+      tasa_venta: Number(c.tasa_venta) || 0,
+      tasa_compra: Number(c.tasa_compra) || 0,
+      tasa_retorno: Number(c.tasa_retorno) || 0,
+      ciclos_dia: Number(c.ciclos_dia) || 0,
+      metodos_pago: Number(c.metodos_pago) || 0,
+      monto_venta: Number(c.monto_venta) || 0,
+      monto_compra: Number(c.monto_compra) || 0,
+      ganancia_porcentaje: Number(c.ganancia_porcentaje) || 0,
+      ganancia_ciclo: Number(c.ganancia_ciclo) || 0,
+      ganancia_diaria: Number(c.ganancia_diaria) || 0,
+      ganancia_mensual: Number(c.ganancia_mensual) || 0,
+      tasa_minima_compra: Number(c.tasa_minima_compra) || 0,
+    }));
   }
 }
 
@@ -136,7 +174,25 @@ export async function saveCalculation(input: CalculationInput & { label: string 
       body: JSON.stringify(newSim),
     });
     if (!response.ok) throw new Error('Error al guardar simulacion en el servidor');
-    return await response.json();
+    const saved: SavedCalculation = await response.json();
+    return {
+      ...saved,
+      capital: Number(saved.capital) || 0,
+      comision_compra: Number(saved.comision_compra) || 0,
+      comision_venta: Number(saved.comision_venta) || 0,
+      tasa_venta: Number(saved.tasa_venta) || 0,
+      tasa_compra: Number(saved.tasa_compra) || 0,
+      tasa_retorno: Number(saved.tasa_retorno) || 0,
+      ciclos_dia: Number(saved.ciclos_dia) || 0,
+      metodos_pago: Number(saved.metodos_pago) || 0,
+      monto_venta: Number(saved.monto_venta) || 0,
+      monto_compra: Number(saved.monto_compra) || 0,
+      ganancia_porcentaje: Number(saved.ganancia_porcentaje) || 0,
+      ganancia_ciclo: Number(saved.ganancia_ciclo) || 0,
+      ganancia_diaria: Number(saved.ganancia_diaria) || 0,
+      ganancia_mensual: Number(saved.ganancia_mensual) || 0,
+      tasa_minima_compra: Number(saved.tasa_minima_compra) || 0,
+    };
   } catch (error) {
     if (error instanceof Error && error.name !== 'TypeError') {
       throw error;

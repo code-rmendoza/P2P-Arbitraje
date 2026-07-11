@@ -2,6 +2,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import type { Wallet } from './wallets';
 import type { Transaction } from './transactions';
+import { formatNumber } from '../utils/currency';
 
 interface PortfolioData {
   wallets: Wallet[];
@@ -22,15 +23,15 @@ export function exportPortfolioPDF(data: PortfolioData) {
   doc.setFontSize(10);
   doc.setTextColor(100);
   doc.text(`Fecha: ${new Date().toLocaleDateString('es-VE')}`, 14, 30);
-  doc.text(`Tasa BCV: ${tasaBcv} Bs/USDT`, 14, 36);
+  doc.text(`Tasa BCV: ${formatNumber(tasaBcv, 4)} Bs/USDT`, 14, 36);
 
   // Summary
   doc.setFontSize(12);
   doc.setTextColor(0);
   doc.text('Resumen', 14, 48);
   doc.setFontSize(10);
-  doc.text(`Total: $${totalUsdt.toFixed(2)} USDT`, 14, 56);
-  doc.text(`Profit: ${profitUsdt >= 0 ? '+' : ''}$${profitUsdt.toFixed(2)} USDT (${profitPct >= 0 ? '+' : ''}${profitPct.toFixed(2)}%)`, 14, 62);
+  doc.text(`Total: $${formatNumber(totalUsdt)} USDT`, 14, 56);
+  doc.text(`Profit: ${profitUsdt >= 0 ? '+' : ''}$${formatNumber(profitUsdt)} USDT (${profitPct >= 0 ? '+' : ''}${formatNumber(profitPct)}%)`, 14, 62);
 
   // Wallets table
   const activeWallets = wallets.filter(w => w.is_active);
@@ -39,8 +40,8 @@ export function exportPortfolioPDF(data: PortfolioData) {
       w.name,
       w.platform,
       w.currency,
-      w.balance.toFixed(w.currency === 'VES' ? 0 : 2),
-      (w.opening_balance ?? w.balance).toFixed(w.currency === 'VES' ? 0 : 2),
+      formatNumber(w.balance),
+      formatNumber(w.opening_balance ?? w.balance),
     ]);
 
     autoTable(doc, {
@@ -66,8 +67,8 @@ export function exportPortfolioPDF(data: PortfolioData) {
       new Date(tx.date).toLocaleDateString('es-VE'),
       tx.type.replace('_P2P', ''),
       `${tx.wallet_from_name || 'Ext'} -> ${tx.wallet_to_name || 'Ext'}`,
-      `-${tx.amount_out.toFixed(2)}`,
-      `+${tx.amount_in.toFixed(2)}`,
+      `-${formatNumber(tx.amount_out)}`,
+      `+${formatNumber(tx.amount_in)}`,
       tx.rate.toFixed(4),
     ]);
 

@@ -25,13 +25,29 @@ export async function fetchTransactions(): Promise<Transaction[]> {
   try {
     const response = await fetch(`${API_BASE_URL}/transactions/`);
     if (!response.ok) throw new Error('Error al obtener transacciones del servidor');
-    return await response.json();
+    const data: Transaction[] = await response.json();
+    const normalized = data.map(tx => ({
+      ...tx,
+      amount_out: Number(tx.amount_out) || 0,
+      amount_in: Number(tx.amount_in) || 0,
+      rate: Number(tx.rate) || 0,
+      commission_pct: Number(tx.commission_pct) || 0,
+    }));
+    localStorage.setItem('p2p_transactions', JSON.stringify(normalized));
+    return normalized;
   } catch (error) {
     if (error instanceof Error && error.name !== 'TypeError') {
       throw error;
     }
     const local = localStorage.getItem('p2p_transactions');
-    return local ? JSON.parse(local) : [];
+    const data: Transaction[] = local ? JSON.parse(local) : [];
+    return data.map(tx => ({
+      ...tx,
+      amount_out: Number(tx.amount_out) || 0,
+      amount_in: Number(tx.amount_in) || 0,
+      rate: Number(tx.rate) || 0,
+      commission_pct: Number(tx.commission_pct) || 0,
+    }));
   }
 }
 
@@ -49,7 +65,14 @@ export async function saveTransaction(
       const errData = await response.json().catch(() => ({}));
       throw new Error(errData.error || 'Error al guardar transaccion en el servidor');
     }
-    return await response.json();
+    const saved: Transaction = await response.json();
+    return {
+      ...saved,
+      amount_out: Number(saved.amount_out) || 0,
+      amount_in: Number(saved.amount_in) || 0,
+      rate: Number(saved.rate) || 0,
+      commission_pct: Number(saved.commission_pct) || 0,
+    };
   } catch (error: any) {
     if (error.message && !error.message.includes('offline') && !error.message.includes('fetch')) {
       throw error;

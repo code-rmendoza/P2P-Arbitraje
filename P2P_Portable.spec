@@ -118,10 +118,15 @@ django_imports = [
     'requests',
 ]
 
+import django
+django_dir = os.path.dirname(django.__file__)
+django_locale = os.path.join(django_dir, 'conf', 'locale')
+
 # Config files for auto-update system
 config_datas = [
     (os.path.join(ROOT, 'version.json'), '.'),
     (os.path.join(ROOT, 'release_config.json'), '.'),
+    (django_locale, os.path.join('django', 'conf', 'locale')),
 ]
 
 a = Analysis(

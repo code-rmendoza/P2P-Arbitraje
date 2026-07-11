@@ -15,7 +15,9 @@ export interface Wallet {
 export function normalizeWallets(wallets: Wallet[]): Wallet[] {
   const byIdentity = new Map<string, Wallet>();
   wallets.forEach(wallet => {
-    const normalizedWallet = { ...wallet, opening_balance: wallet.opening_balance ?? wallet.balance };
+    const balance = Number(wallet.balance) || 0;
+    const opening_balance = Number(wallet.opening_balance ?? wallet.balance) || 0;
+    const normalizedWallet = { ...wallet, balance, opening_balance };
     const key = [wallet.name.trim().toLowerCase(), wallet.platform.trim().toLowerCase(), wallet.currency].join('|');
     byIdentity.set(key, { ...byIdentity.get(key), ...normalizedWallet });
   });
@@ -27,29 +29,9 @@ export async function fetchWallets(): Promise<Wallet[]> {
     const response = await fetch(`${API_BASE_URL}/wallets/`);
     if (!response.ok) throw new Error('Error al obtener billeteras del servidor');
     const serverWallets: Wallet[] = await response.json();
-    const local = localStorage.getItem('p2p_wallets');
-
-    if (serverWallets.length === 0 && local) {
-      const localWallets = normalizeWallets(JSON.parse(local));
-      const migratedWallets: Wallet[] = [];
-      for (const wallet of localWallets) {
-        const createResponse = await authFetch(`${API_BASE_URL}/wallets/`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: wallet.name, platform: wallet.platform, currency: wallet.currency,
-            balance: wallet.balance, opening_balance: wallet.opening_balance ?? wallet.balance,
-            is_active: wallet.is_active, color: wallet.color,
-          }),
-        });
-        if (!createResponse.ok) throw new Error('Error al migrar billeteras locales al servidor');
-        migratedWallets.push(await createResponse.json());
-      }
-      localStorage.setItem('p2p_wallets', JSON.stringify(migratedWallets));
-      return migratedWallets;
-    }
-
-    return serverWallets;
+    const normalizedServer = normalizeWallets(serverWallets);
+    localStorage.setItem('p2p_wallets', JSON.stringify(normalizedServer));
+    return normalizedServer;
   } catch (error) {
     if (error instanceof Error && error.name !== 'TypeError') {
       throw error;
@@ -79,7 +61,12 @@ export async function saveWallet(input: Omit<Wallet, 'id' | 'created_at'> & { id
       const msg = errData.non_field_errors?.[0] || errData.error || 'Error al guardar billetera en el servidor';
       throw new Error(msg);
     }
-    return await response.json();
+    const saved: Wallet = await response.json();
+    return {
+      ...saved,
+      balance: Number(saved.balance) || 0,
+      opening_balance: Number(saved.opening_balance ?? saved.balance) || 0,
+    };
   } catch (error) {
     if (error instanceof Error && error.name !== 'TypeError') {
       throw error;
@@ -91,7 +78,12 @@ export async function saveWallet(input: Omit<Wallet, 'id' | 'created_at'> & { id
     if (input.id) {
       const idx = list.findIndex(w => w.id === input.id);
       if (idx !== -1) {
-        finalWallet = { ...list[idx], ...input };
+        finalWallet = {
+          ...list[idx],
+          ...input,
+          balance: Number(input.balance) || 0,
+          opening_balance: Number(input.opening_balance ?? input.balance) || 0,
+        };
         list[idx] = finalWallet;
       } else {
         throw new Error('Billetera no encontrada');
@@ -108,7 +100,8 @@ export async function saveWallet(input: Omit<Wallet, 'id' | 'created_at'> & { id
           ...list[duplicateIdx], ...input,
           id: list[duplicateIdx].id,
           created_at: list[duplicateIdx].created_at,
-          opening_balance: input.opening_balance ?? input.balance,
+          balance: Number(input.balance) || 0,
+          opening_balance: Number(input.opening_balance ?? input.balance) || 0,
         };
         list[duplicateIdx] = finalWallet;
         localStorage.setItem('p2p_wallets', JSON.stringify(list));
@@ -117,7 +110,8 @@ export async function saveWallet(input: Omit<Wallet, 'id' | 'created_at'> & { id
 
       finalWallet = {
         id: Date.now(), ...input,
-        opening_balance: input.opening_balance ?? input.balance,
+        balance: Number(input.balance) || 0,
+        opening_balance: Number(input.opening_balance ?? input.balance) || 0,
         created_at: new Date().toISOString(),
       };
       list.push(finalWallet);

@@ -25,13 +25,29 @@ export async function fetchLogs(): Promise<DailyLog[]> {
   try {
     const response = await fetch(`${API_BASE_URL}/logs/`);
     if (!response.ok) throw new Error('Error al obtener bitacora del servidor');
-    return await response.json();
+    const data: DailyLog[] = await response.json();
+    const normalized = data.map(log => ({
+      ...log,
+      profit: Number(log.profit) || 0,
+      volume: Number(log.volume) || 0,
+      comision_compra: Number(log.comision_compra) || 0,
+      comision_venta: Number(log.comision_venta) || 0,
+    }));
+    localStorage.setItem('p2p_logs', JSON.stringify(normalized));
+    return normalized;
   } catch (error) {
     if (error instanceof Error && error.name !== 'TypeError') {
       throw error;
     }
     const local = localStorage.getItem('p2p_logs');
-    return local ? JSON.parse(local) : [];
+    const data: DailyLog[] = local ? JSON.parse(local) : [];
+    return data.map(log => ({
+      ...log,
+      profit: Number(log.profit) || 0,
+      volume: Number(log.volume) || 0,
+      comision_compra: Number(log.comision_compra) || 0,
+      comision_venta: Number(log.comision_venta) || 0,
+    }));
   }
 }
 
@@ -46,7 +62,14 @@ export async function saveLog(input: DailyLogInput): Promise<DailyLog> {
       body: JSON.stringify(input),
     });
     if (!response.ok) throw new Error('Error al guardar registro en el servidor');
-    return await response.json();
+    const saved: DailyLog = await response.json();
+    return {
+      ...saved,
+      profit: Number(saved.profit) || 0,
+      volume: Number(saved.volume) || 0,
+      comision_compra: Number(saved.comision_compra) || 0,
+      comision_venta: Number(saved.comision_venta) || 0,
+    };
   } catch (error) {
     if (error instanceof Error && error.name !== 'TypeError') {
       throw error;

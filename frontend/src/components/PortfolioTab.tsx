@@ -2,6 +2,7 @@ import { WalletCards, Plus, Info, Edit3, X, Trash2, ArrowRight, CheckCircle, Fil
 import type { CSSProperties } from 'react';
 import type { Wallet, Transaction } from '../api';
 import { exportPortfolioPDF } from '../api/pdf';
+import { formatNumber } from '../utils/currency';
 
 interface PortfolioTabProps {
   wallets: Wallet[];
@@ -183,32 +184,32 @@ export function PortfolioTab({
       <div className="portfolio-kpi-row">
         <div className="metric-card success">
           <span className="metric-label">Total consolidado</span>
-          <span className="metric-value">${totalPortfolioUsdt.toFixed(2)}</span>
+          <span className="metric-value">${formatNumber(totalPortfolioUsdt)}</span>
           <span className="metric-desc">Estimado en USDT usando USD 1:1 y BCV para VES</span>
         </div>
         <div className={`metric-card ${realPortfolioProfitUsdt >= 0 ? 'success' : ''}`}>
           <span className="metric-label">Profit real</span>
           <span className="metric-value" style={{ color: realPortfolioProfitUsdt >= 0 ? 'var(--color-success)' : 'var(--color-danger)' }}>
-            {realPortfolioProfitUsdt >= 0 ? '+' : ''}${realPortfolioProfitUsdt.toFixed(2)}
+            {realPortfolioProfitUsdt >= 0 ? '+' : ''}${formatNumber(realPortfolioProfitUsdt)}
           </span>
           <span className="metric-desc">
-            {realPortfolioProfitPct >= 0 ? '+' : ''}{realPortfolioProfitPct.toFixed(2)}% sobre capital inicial
+            {realPortfolioProfitPct >= 0 ? '+' : ''}{formatNumber(realPortfolioProfitPct)}% sobre capital inicial
           </span>
         </div>
         <div className="metric-card">
           <span className="metric-label">USDT</span>
-          <span className="metric-value">{groupedBalance('USDT').toFixed(2)}</span>
+          <span className="metric-value">{formatNumber(groupedBalance('USDT'))}</span>
           <span className="metric-desc">Disponible en wallets cripto</span>
         </div>
         <div className="metric-card accent">
           <span className="metric-label">USD</span>
-          <span className="metric-value">{groupedBalance('USD').toFixed(2)}</span>
+          <span className="metric-value">{formatNumber(groupedBalance('USD'))}</span>
           <span className="metric-desc">Zinli, Wally u otros saldos USD</span>
         </div>
         <div className="metric-card warning">
           <span className="metric-label">VES</span>
-          <span className="metric-value">{groupedBalance('VES').toFixed(0)}</span>
-          <span className="metric-desc">Equiv. ${(tasaBcv > 0 ? groupedBalance('VES') / tasaBcv : 0).toFixed(2)} USDT</span>
+          <span className="metric-value">{formatNumber(groupedBalance('VES'))}</span>
+          <span className="metric-desc">Equiv. ${(tasaBcv > 0 ? formatNumber(groupedBalance('VES') / tasaBcv) : '0.00')} USDT</span>
         </div>
       </div>
 
@@ -228,23 +229,23 @@ export function PortfolioTab({
             {profitRows.map(row => (
               <tr key={row.currency}>
                 <td><span className="badge badge-platform">{row.currency}</span></td>
-                <td>{row.current.toFixed(row.currency === 'VES' ? 0 : 2)}</td>
-                <td>{row.opening.toFixed(row.currency === 'VES' ? 0 : 2)}</td>
-                <td>{row.deposits.toFixed(row.currency === 'VES' ? 0 : 2)}</td>
-                <td>{row.withdrawals.toFixed(row.currency === 'VES' ? 0 : 2)}</td>
+                <td>{formatNumber(row.current)}</td>
+                <td>{formatNumber(row.opening)}</td>
+                <td>{formatNumber(row.deposits)}</td>
+                <td>{formatNumber(row.withdrawals)}</td>
                 <td className={row.profit >= 0 ? 'tx-amount-in' : 'tx-amount-out'}>
-                  {row.profit >= 0 ? '+' : ''}{row.profit.toFixed(row.currency === 'VES' ? 0 : 2)} {row.currency}
+                  {row.profit >= 0 ? '+' : ''}{formatNumber(row.profit)} {row.currency}
                 </td>
               </tr>
             ))}
             <tr>
               <td><strong>Total USDT</strong></td>
-              <td>{totalPortfolioUsdt.toFixed(2)}</td>
-              <td>{totalOpeningUsdt.toFixed(2)}</td>
-              <td>{totalDepositsUsdt.toFixed(2)}</td>
-              <td>{totalWithdrawalsUsdt.toFixed(2)}</td>
+              <td>{formatNumber(totalPortfolioUsdt)}</td>
+              <td>{formatNumber(totalOpeningUsdt)}</td>
+              <td>{formatNumber(totalDepositsUsdt)}</td>
+              <td>{formatNumber(totalWithdrawalsUsdt)}</td>
               <td className={realPortfolioProfitUsdt >= 0 ? 'tx-amount-in' : 'tx-amount-out'}>
-                {realPortfolioProfitUsdt >= 0 ? '+' : ''}{realPortfolioProfitUsdt.toFixed(2)} USDT
+                {realPortfolioProfitUsdt >= 0 ? '+' : ''}{formatNumber(realPortfolioProfitUsdt)} USDT
               </td>
             </tr>
           </tbody>
@@ -287,13 +288,13 @@ export function PortfolioTab({
                   {!wallet.is_active && <span className="badge badge-platform">Inactiva</span>}
                 </div>
                 <div className="wallet-balance-row">
-                  <span className="wallet-balance-val">{closing.toFixed(wallet.currency === 'VES' ? 0 : 2)}</span>
+                  <span className="wallet-balance-val">{formatNumber(closing)}</span>
                   <span className="wallet-balance-curr">{wallet.currency}</span>
                 </div>
                 <div className="wallet-meta-container metric-desc">
-                  <span>Inicial: {opening.toFixed(wallet.currency === 'VES' ? 0 : 2)} {wallet.currency}</span>
+                  <span>Inicial: {formatNumber(opening)} {wallet.currency}</span>
                   <span style={{ fontWeight: 600, color: walletProfit > 0.0001 ? 'var(--color-success-hover)' : walletProfit < -0.0001 ? 'var(--color-danger)' : 'var(--text-muted)' }}>
-                    Profit: {walletProfit > 0.0001 ? '+' : ''}{walletProfit.toFixed(wallet.currency === 'VES' ? 0 : 2)} {wallet.currency}
+                    Profit: {walletProfit > 0.0001 ? '+' : ''}{formatNumber(walletProfit)} {wallet.currency}
                   </span>
                 </div>
                 <div className="wallet-card-actions">
@@ -325,7 +326,7 @@ export function PortfolioTab({
           <select className="form-input" value={txWalletFrom} onChange={(e) => setTxWalletFrom(e.target.value)}>
             <option value="">Externo / Deposito</option>
             {activeWallets.map(wallet => (
-              <option key={wallet.id} value={wallet.id}>{wallet.name} - {wallet.balance.toFixed(2)} {wallet.currency}</option>
+              <option key={wallet.id} value={wallet.id}>{wallet.name} - {formatNumber(wallet.balance)} {wallet.currency}</option>
             ))}
           </select>
         </div>
@@ -434,8 +435,8 @@ export function PortfolioTab({
                         <span>{tx.wallet_to_name || 'Externo'}</span>
                       </div>
                     </td>
-                    <td className="tx-amount-out">-{tx.amount_out.toFixed(2)} {tx.wallet_from_currency || ''}</td>
-                    <td className="tx-amount-in">+{tx.amount_in.toFixed(2)} {tx.wallet_to_currency || ''}</td>
+                    <td className="tx-amount-out">-{formatNumber(tx.amount_out)} {tx.wallet_from_currency || ''}</td>
+                    <td className="tx-amount-in">+{formatNumber(tx.amount_in)} {tx.wallet_to_currency || ''}</td>
                     <td>{tx.rate.toFixed(4)}</td>
                     <td>{tx.commission_pct.toFixed(2)}%</td>
                     <td>

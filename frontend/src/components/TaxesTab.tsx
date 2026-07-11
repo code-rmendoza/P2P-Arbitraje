@@ -1,5 +1,6 @@
 import { DollarSign, Info, RefreshCw, CheckCircle } from 'lucide-react';
 import type { DailyLog } from '../api';
+import { formatNumber } from '../utils/currency';
 
 interface TaxesTabProps {
   year: number;
@@ -102,7 +103,7 @@ export function TaxesTab({
         <div className="calendar-stat-item">
           <span className="calendar-stat-label">Profit Gravable (VES)</span>
           <span className="calendar-stat-value profit" style={{ fontSize: '1.5rem' }}>
-            +{yearProfitUsdt.toFixed(2)} USDT
+            +{formatNumber(yearProfitUsdt)} USDT
           </span>
         </div>
       </div>
@@ -111,14 +112,14 @@ export function TaxesTab({
         <div className="fiscal-alert success">
           <Info style={{ width: '1.25rem', height: '1.25rem', flexShrink: 0 }} />
           <div>
-            <strong>Bajo el minimo de 1.000 UT — No obligado a declarar.</strong> Tus ganancias totales anuales de <strong>{profitInUt.toFixed(2)} UT</strong> estan por debajo del limite minimo establecido de 1,000 UT. No estas legalmente obligado a realizar pago de ISLR segun la tarifa N 1.
+            <strong>Bajo el minimo de 1.000 UT — No obligado a declarar.</strong> Tus ganancias totales anuales de <strong>{formatNumber(profitInUt)} UT</strong> estan por debajo del limite minimo establecido de 1,000 UT. No estas legalmente obligado a realizar pago de ISLR segun la tarifa N 1.
           </div>
         </div>
       ) : (
         <div className="fiscal-alert warning">
           <Info style={{ width: '1.25rem', height: '1.25rem', flexShrink: 0 }} />
           <div>
-            <strong>Obligacion de Declaracion Activa.</strong> Tus ingresos netos de <strong>{profitInUt.toFixed(2)} UT</strong> exceden las 1,000 UT anuales. Debes presentar tu declaracion estimada y definitiva de ISLR.
+            <strong>Obligacion de Declaracion Activa.</strong> Tus ingresos netos de <strong>{formatNumber(profitInUt)} UT</strong> exceden las 1,000 UT anuales. Debes presentar tu declaracion estimada y definitiva de ISLR.
           </div>
         </div>
       )}
@@ -126,35 +127,35 @@ export function TaxesTab({
       <div className="metrics-grid" style={{ marginBottom: '1.5rem' }}>
         <div className="metric-card success">
           <div className="metric-label">Profit Real VES</div>
-          <div className="metric-value">{yearProfitUsdt.toFixed(2)} USDT</div>
+          <div className="metric-value">{formatNumber(yearProfitUsdt)} USDT</div>
           <div className="metric-desc">Suma acumulada gravable del ano {year}</div>
         </div>
         <div className="metric-card accent">
           <div className="metric-label">En Bolivares</div>
-          <div className="metric-value">Bs. {profitInBoli.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-          <div className="metric-desc">Tasa BCV de cambio: {tasaBcv} Bs/USDT</div>
+          <div className="metric-value">Bs. {formatNumber(profitInBoli)}</div>
+          <div className="metric-desc">Tasa BCV de cambio: {formatNumber(tasaBcv, 4)} Bs/USDT</div>
         </div>
         <div className="metric-card success">
           <div className="metric-label">En Unidades Tributarias (UT)</div>
-          <div className="metric-value">{profitInUt.toFixed(2)} UT</div>
-          <div className="metric-desc">Valor UT de referencia: Bs. {valorUt}</div>
+          <div className="metric-value">{formatNumber(profitInUt)} UT</div>
+          <div className="metric-desc">Valor UT de referencia: Bs. {formatNumber(valorUt)}</div>
         </div>
         <div className="metric-card warning" style={{ borderLeft: '4px solid var(--color-danger)' }}>
           <div className="metric-label" style={{ color: 'var(--color-danger)' }}>ISLR Estimado a Pagar</div>
           <div className="metric-value" style={{ color: 'var(--color-danger)' }}>
-            ${taxOwedUsdt.toFixed(2)}
+            ${formatNumber(taxOwedUsdt)}
             <span style={{ fontSize: '0.8rem', marginLeft: '0.25rem', fontWeight: 500 }}>USDT</span>
           </div>
-          <div className="metric-desc">Bs. {taxOwedBoli.toFixed(2)} (~{taxOwedUt.toFixed(1)} UT)</div>
+          <div className="metric-desc">Bs. {formatNumber(taxOwedBoli)} (~{formatNumber(taxOwedUt, 1)} UT)</div>
         </div>
       </div>
 
       <div style={{ padding: '0.85rem 1.25rem', backgroundColor: 'var(--bg-app)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span>
           <CheckCircle style={{ width: '1rem', height: '1rem', display: 'inline', color: 'var(--color-primary)', marginRight: '0.5rem', verticalAlign: 'text-bottom' }} />
-          <strong>Separacion de Carteras:</strong> El sistema detecto <strong>${yearUsdProfitTotal.toFixed(2)} USDT</strong> de ganancias puras en USD (Zinli, Wally) que <strong>fueron excluidas</strong> de este calculo fiscal.
+          <strong>Separacion de Carteras:</strong> El sistema detecto <strong>${formatNumber(yearUsdProfitTotal)} USDT</strong> de ganancias puras en USD (Zinli, Wally) que <strong>fueron excluidas</strong> de este calculo fiscal.
         </span>
-        <span style={{ fontWeight: 700, color: 'var(--color-primary)' }}>Excluido: ${yearUsdProfitTotal.toFixed(2)} USD</span>
+        <span style={{ fontWeight: 700, color: 'var(--color-primary)' }}>Excluido: ${formatNumber(yearUsdProfitTotal)} USD</span>
       </div>
 
       <h3 className="card-title" style={{ fontSize: '1.05rem', borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem', marginBottom: '1rem' }}>

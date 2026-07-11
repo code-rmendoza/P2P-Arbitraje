@@ -197,4 +197,5 @@ REST_FRAMEWORK = {
     'DEFAULT_THROTTLE_RATES': {
         'anon': '60/minute',
     },
+    'COERCE_DECIMAL_TO_STRING': False,
 }
