@@ -52,18 +52,65 @@ settings.CORS_ALLOW_ALL_ORIGINS = False
 
 django.setup()
 
-# Repair missing columns directly via SQL (bypasses broken migration state)
+# Generic schema repair: add any missing columns to existing tables
+# This handles cases where migration state is recorded but columns were never created
 try:
     import sqlite3 as _sqlite3
+    from django.apps import apps as _apps
+
+    _FIELD_SQL = {
+        'AutoField': 'INTEGER',
+        'BigAutoField': 'INTEGER',
+        'CharField': 'VARCHAR({max_length})',
+        'TextField': 'TEXT',
+        'IntegerField': 'INTEGER',
+        'BigIntegerField': 'INTEGER',
+        'SmallIntegerField': 'INTEGER',
+        'BooleanField': 'SMALLINT',
+        'DecimalField': 'DECIMAL({max_digits},{decimal_places})',
+        'FloatField': 'REAL',
+        'DateField': 'DATE',
+        'DateTimeField': 'DATETIME',
+        'TimeField': 'TIME',
+        'ForeignKey': 'INTEGER',
+        'OneToOneField': 'INTEGER',
+    }
+
+    def _repair_table(conn, model):
+        table = model._meta.db_table
+        try:
+            db_cols = {row[1] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+        except Exception:
+            return
+        for field in model._meta.get_fields():
+            if hasattr(field, 'column') and field.column not in db_cols:
+                col_type = _FIELD_SQL.get(type(field).__name__, 'TEXT')
+                if 'max_length' in col_type:
+                    col_type = col_type.format(max_length=getattr(field, 'max_length', 255))
+                if 'max_digits' in col_type:
+                    col_type = col_type.format(
+                        max_digits=getattr(field, 'max_digits', 10),
+                        decimal_places=getattr(field, 'decimal_places', 2)
+                    )
+                nullable = 'NULL' if getattr(field, 'null', True) else 'NOT NULL'
+                default = getattr(field, 'default', None)
+                default_sql = ''
+                if default is not None and not callable(default):
+                    default_sql = f" DEFAULT {default}"
+                elif getattr(field, 'null', True):
+                    default_sql = ' DEFAULT NULL'
+                try:
+                    conn.execute(f"ALTER TABLE {table} ADD COLUMN {field.column} {col_type} {nullable}{default_sql}")
+                except Exception:
+                    pass
+        conn.commit()
+
     _db_path = str(DATA_DIR / 'db.sqlite3')
     if Path(_db_path).exists():
         _conn = _sqlite3.connect(_db_path)
-        _cursor = _conn.execute("PRAGMA table_info(calculator_transaction)")
-        _cols = {row[1] for row in _cursor.fetchall()}
-        if 'category' not in _cols:
-            _conn.execute("ALTER TABLE calculator_transaction ADD COLUMN category VARCHAR(50) NULL")
-            _conn.execute("DELETE FROM django_migrations WHERE app='calculator' AND name LIKE '0009%'")
-            _conn.commit()
+        for model in _apps.get_models():
+            if model._meta.app_label == 'calculator':
+                _repair_table(_conn, model)
         _conn.close()
 except Exception:
     pass
