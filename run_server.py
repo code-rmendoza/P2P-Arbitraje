@@ -54,12 +54,9 @@ django.setup()
 
 # Always run migrate on startup to ensure database schema is up-to-date
 try:
-    call_command('migrate', '--fake-initial', verbosity=0)
-except Exception as e:
-    try:
-        call_command('migrate', '--run-syncdb', verbosity=0)
-    except Exception:
-        pass
+    call_command('migrate', verbosity=0)
+except Exception:
+    pass
 
 django_app = get_wsgi_application()
 
