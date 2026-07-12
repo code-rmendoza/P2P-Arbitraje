@@ -52,9 +52,14 @@ settings.CORS_ALLOW_ALL_ORIGINS = False
 
 django.setup()
 
-db_path = DATA_DIR / 'db.sqlite3'
-if not db_path.exists():
-    call_command('migrate', '--run-syncdb', verbosity=0)
+# Always run migrate on startup to ensure database schema is up-to-date
+try:
+    call_command('migrate', '--fake-initial', verbosity=0)
+except Exception as e:
+    try:
+        call_command('migrate', '--run-syncdb', verbosity=0)
+    except Exception:
+        pass
 
 django_app = get_wsgi_application()
 
