@@ -97,6 +97,7 @@ Frontend build uses `tsc -b && vite build`. Frontend test suite runs with Vitest
 - **Frontend test suite**: Vitest (`pnpm test`). Backend: `calculator/tests.py` with 40 tests (covers validation, constraints, auth, updates, fallbacks, transactions, system endpoints).
 - **Serializers validate at write time**: DailyLog checks volume/profit >= 0, Wallet checks hex color and unique identity.
 - **Logging**: Django LOGGING configured for `calculator` (INFO) and `django.request` (WARNING) to console.
+- **Startup schema repair**: `run_server.py` auto-repairs missing columns for all `calculator` models via raw SQL `ALTER TABLE` before running `migrate`. Handles corrupt DB state where migration is recorded but column was never created.
 
 ## Auto-Update System
 
