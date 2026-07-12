@@ -5,7 +5,7 @@ from django.db import transaction as db_transaction
 from django.db.models import Q
 from decimal import Decimal
 
-from calculator.models import Wallet, Transaction
+from calculator.models import Wallet, Transaction, DailyLog
 from calculator.serializers import WalletSerializer, TransactionSerializer
 from calculator.auth import RequireAuthForDestructive
 
@@ -60,7 +60,16 @@ class TransactionViewSet(viewsets.ModelViewSet):
         amount_out = Decimal(str(data.get('amount_out', 0)))
         amount_in = Decimal(str(data.get('amount_in', 0)))
         tx_type = data.get('type')
-        tasa_bcv = Decimal(str(request.data.get('tasa_bcv', 0.0)))
+        tasa_bcv_raw = request.data.get('tasa_bcv', 0)
+        try:
+            tasa_bcv = Decimal(str(tasa_bcv_raw))
+        except Exception:
+            tasa_bcv = Decimal('0')
+        if tasa_bcv < 0:
+            return Response(
+                {"error": "La tasa BCV no puede ser negativa."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         # Validate: at least one wallet must be involved
         if not wallet_from and not wallet_to:
@@ -158,19 +167,18 @@ class TransactionViewSet(viewsets.ModelViewSet):
                 notes = f"[Auto-Transaccion #{instance.id}] Movimiento: {tx_type} | Ruta: {wallet_from.name if wallet_from else 'Externo'} → {wallet_to.name if wallet_to else 'Externo'} | Tasa: {instance.rate} | Notas: {instance.notes or ''}"
                 tipo_op = 'VES' if (from_curr == 'VES' or to_curr == 'VES') else 'USD'
 
-                from calculator.models import DailyLog
                 DailyLog.objects.create(
                     date=instance.date.date(),
-                    profit=float(round(prof, 4)),
-                    volume=float(round(vol, 2)),
+                    profit=prof.quantize(Decimal('0.0001')),
+                    volume=vol.quantize(Decimal('0.01')),
                     notes=notes,
                     imported=True,
                     tipo_operativa=tipo_op,
                     plataforma_compra=wallet_to.platform if tx_type == 'COMPRA_P2P' else wallet_from.platform,
                     plataforma_venta=wallet_from.platform if tx_type == 'VENTA_P2P' else wallet_to.platform,
-                    comision_compra=float(instance.commission_pct) if tx_type == 'COMPRA_P2P' else 0.0,
-                    comision_venta=float(instance.commission_pct) if tx_type == 'VENTA_P2P' else 0.0,
-                    metodo_compra=wallet_from.name if tx_type == 'VENTA_P2P' else wallet_to.name,
+                    comision_compra=instance.commission_pct if tx_type == 'COMPRA_P2P' else Decimal('0'),
+                    comision_venta=instance.commission_pct if tx_type == 'VENTA_P2P' else Decimal('0'),
+                    metodo_compra=wallet_to.name if tx_type == 'COMPRA_P2P' else wallet_from.name,
                     metodo_venta=wallet_from.name if tx_type == 'VENTA_P2P' else wallet_to.name,
                 )
 
@@ -211,7 +219,6 @@ class TransactionViewSet(viewsets.ModelViewSet):
                 wallet_to.save(update_fields=['balance'])
             
             # Atomically delete associated auto-created DailyLog
-            from calculator.models import DailyLog
             DailyLog.objects.filter(notes__contains=f"[Auto-Transaccion #{instance.id}]").delete()
             
             instance.delete()

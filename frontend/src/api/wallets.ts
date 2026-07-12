@@ -14,19 +14,24 @@ export interface Wallet {
 
 export function normalizeWallets(wallets: Wallet[]): Wallet[] {
   const byIdentity = new Map<string, Wallet>();
+  const seen = new Set<string>();
   wallets.forEach(wallet => {
     const balance = Number(wallet.balance) || 0;
     const opening_balance = Number(wallet.opening_balance ?? wallet.balance) || 0;
     const normalizedWallet = { ...wallet, balance, opening_balance };
     const key = [wallet.name.trim().toLowerCase(), wallet.platform.trim().toLowerCase(), wallet.currency].join('|');
+    if (byIdentity.has(key)) {
+      console.warn(`[normalizeWallets] Duplicado detectado: "${wallet.name}" / ${wallet.platform} / ${wallet.currency} — se usa el ultimo valor`);
+    }
     byIdentity.set(key, { ...byIdentity.get(key), ...normalizedWallet });
+    seen.add(key);
   });
   return Array.from(byIdentity.values());
 }
 
 export async function fetchWallets(): Promise<Wallet[]> {
   try {
-    const response = await fetch(`${API_BASE_URL}/wallets/`);
+    const response = await authFetch(`${API_BASE_URL}/wallets/`);
     if (!response.ok) throw new Error('Error al obtener billeteras del servidor');
     const serverWallets: Wallet[] = await response.json();
     const normalizedServer = normalizeWallets(serverWallets);

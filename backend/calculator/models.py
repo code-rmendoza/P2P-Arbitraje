@@ -1,17 +1,18 @@
 from django.db import models
+from decimal import Decimal
 
 
 class Calculation(models.Model):
     label = models.CharField(max_length=100)
     capital = models.DecimalField(max_digits=14, decimal_places=2)
-    comision = models.DecimalField(max_digits=6, decimal_places=4, default=0.35)  # Legacy field
+    comision = models.DecimalField(max_digits=6, decimal_places=4, default=Decimal('0.35'))  # Legacy field
     
     # Multi-Currency / Multi-Platform fields
     tipo_operativa = models.CharField(max_length=20, default='USD')
     plataforma_compra = models.CharField(max_length=50, default='Binance P2P')
     plataforma_venta = models.CharField(max_length=50, default='Binance P2P')
-    comision_compra = models.DecimalField(max_digits=6, decimal_places=4, default=0.35)
-    comision_venta = models.DecimalField(max_digits=6, decimal_places=4, default=0.35)
+    comision_compra = models.DecimalField(max_digits=6, decimal_places=4, default=Decimal('0.35'))
+    comision_venta = models.DecimalField(max_digits=6, decimal_places=4, default=Decimal('0.35'))
     metodo_compra = models.CharField(max_length=50, default='Zinli')
     metodo_venta = models.CharField(max_length=50, default='Zinli')
     
@@ -42,16 +43,16 @@ class Calculation(models.Model):
 
 class DailyLog(models.Model):
     date = models.DateField(db_index=True)
-    profit = models.DecimalField(max_digits=14, decimal_places=2, default=0.0)
-    volume = models.DecimalField(max_digits=14, decimal_places=2, default=0.0)
+    profit = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal('0.0'))
+    volume = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal('0.0'))
     imported = models.BooleanField(default=False)
     notes = models.TextField(blank=True, default='')
     
     tipo_operativa = models.CharField(max_length=20, default='USD')
     plataforma_compra = models.CharField(max_length=50, default='Binance P2P')
     plataforma_venta = models.CharField(max_length=50, default='Binance P2P')
-    comision_compra = models.DecimalField(max_digits=6, decimal_places=4, default=0.35)
-    comision_venta = models.DecimalField(max_digits=6, decimal_places=4, default=0.35)
+    comision_compra = models.DecimalField(max_digits=6, decimal_places=4, default=Decimal('0.35'))
+    comision_venta = models.DecimalField(max_digits=6, decimal_places=4, default=Decimal('0.35'))
     metodo_compra = models.CharField(max_length=50, default='Zinli')
     metodo_venta = models.CharField(max_length=50, default='Zinli')
 
@@ -72,8 +73,8 @@ class Wallet(models.Model):
     name = models.CharField(max_length=100)  # e.g. "Binance USDT Principal"
     platform = models.CharField(max_length=50)  # e.g. "Binance", "Zinli", "Banesco"
     currency = models.CharField(max_length=10, choices=CURRENCY_CHOICES)
-    balance = models.DecimalField(max_digits=14, decimal_places=2, default=0.0)
-    opening_balance = models.DecimalField(max_digits=14, decimal_places=2, default=0.0)
+    balance = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal('0.0'))
+    opening_balance = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal('0.0'))
     is_active = models.BooleanField(default=True)
     color = models.CharField(max_length=7, default='#2563eb')  # Hex color for UI
     created_at = models.DateTimeField(auto_now_add=True)
@@ -114,11 +115,11 @@ class Transaction(models.Model):
         related_name='transactions_in'
     )
     
-    amount_out = models.DecimalField(max_digits=14, decimal_places=2, default=0.0)  # Sale de wallet_from
-    amount_in = models.DecimalField(max_digits=14, decimal_places=2, default=0.0)   # Entra a wallet_to
+    amount_out = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal('0.0'))  # Sale de wallet_from
+    amount_in = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal('0.0'))   # Entra a wallet_to
     
-    rate = models.DecimalField(max_digits=12, decimal_places=4, default=1.0)  # Tasa de cambio utilizada
-    commission_pct = models.DecimalField(max_digits=6, decimal_places=4, default=0.0)  # Comisión P2P %
+    rate = models.DecimalField(max_digits=12, decimal_places=4, default=Decimal('1.0'))  # Tasa de cambio utilizada
+    commission_pct = models.DecimalField(max_digits=6, decimal_places=4, default=Decimal('0.0'))  # Comisión P2P %
     
     category = models.CharField(max_length=50, blank=True, null=True, default=None)  # Categoría contable/fiscal
     notes = models.TextField(blank=True, default='')

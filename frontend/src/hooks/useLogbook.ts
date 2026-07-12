@@ -28,7 +28,7 @@ export function useLogbook(logs: DailyLog[], loadData: () => Promise<void>) {
   const monthName = currentDate.toLocaleString('es-ES', { month: 'long' });
 
   const monthLogs = logs.filter(log => {
-    const d = new Date(log.date + 'T00:00:00');
+    const d = new Date(log.date);
     return d.getFullYear() === year && d.getMonth() === month;
   });
 
@@ -98,7 +98,7 @@ export function useLogbook(logs: DailyLog[], loadData: () => Promise<void>) {
         metodo_compra: newLogMetCompra,
         metodo_venta: newLogMetVenta,
       });
-      loadData();
+      await loadData();
       setNewLogNotes('');
       notify('Operacion agregada a la bitacora');
     } catch { /* ignore */ }
@@ -108,7 +108,7 @@ export function useLogbook(logs: DailyLog[], loadData: () => Promise<void>) {
     if (confirm('¿Estas seguro de borrar este registro de la bitacora?')) {
       try {
         await deleteLog(id);
-        loadData();
+        await loadData();
         notify('Operacion eliminada');
       } catch { /* ignore */ }
     }

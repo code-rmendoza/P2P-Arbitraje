@@ -33,13 +33,13 @@ def compute_p2p_math(capital, tasa_venta, tasa_compra, ciclos_dia,
     tasa_minima_compra = S * (Decimal('1.0') - Cb) * (Decimal('1.0') - Cs)
     
     return {
-        'monto_venta': float(round(monto_venta, 2)),
-        'monto_compra': float(round(monto_compra, 2)),
-        'ganancia_porcentaje': float(round(ganancia_porcentaje, 4)),
-        'ganancia_ciclo': float(round(ganancia_ciclo, 2)),
-        'ganancia_diaria': float(round(ganancia_diaria, 2)),
-        'ganancia_mensual': float(round(ganancia_mensual, 2)),
-        'tasa_minima_compra': float(round(tasa_minima_compra, 3)),
+        'monto_venta': monto_venta.quantize(Decimal('0.01')),
+        'monto_compra': monto_compra.quantize(Decimal('0.01')),
+        'ganancia_porcentaje': ganancia_porcentaje.quantize(Decimal('0.0001')),
+        'ganancia_ciclo': ganancia_ciclo.quantize(Decimal('0.01')),
+        'ganancia_diaria': ganancia_diaria.quantize(Decimal('0.01')),
+        'ganancia_mensual': ganancia_mensual.quantize(Decimal('0.01')),
+        'tasa_minima_compra': tasa_minima_compra.quantize(Decimal('0.001')),
     }
 
 
@@ -126,8 +126,8 @@ class CalculationViewSet(viewsets.ModelViewSet):
             capital=data['capital'], tasa_venta=data['tasa_venta'],
             tasa_compra=data['tasa_compra'], ciclos_dia=data.get('ciclos_dia', 1),
             tipo_operativa=request.data.get('tipo_operativa', 'USD'),
-            comision_compra=float(request.data.get('comision_compra', 0.35)),
-            comision_venta=float(request.data.get('comision_venta', 0.35))
+            comision_compra=data.get('comision_compra', Decimal('0.35')),
+            comision_venta=data.get('comision_venta', Decimal('0.35'))
         )
         
         instance = Calculation.objects.create(
@@ -136,8 +136,8 @@ class CalculationViewSet(viewsets.ModelViewSet):
             tipo_operativa=request.data.get('tipo_operativa', 'USD'),
             plataforma_compra=request.data.get('plataforma_compra', ''),
             plataforma_venta=request.data.get('plataforma_venta', ''),
-            comision_compra=float(request.data.get('comision_compra', 0.35)),
-            comision_venta=float(request.data.get('comision_venta', 0.35)),
+            comision_compra=data.get('comision_compra', Decimal('0.35')),
+            comision_venta=data.get('comision_venta', Decimal('0.35')),
             metodo_compra=request.data.get('metodo_compra', ''),
             metodo_venta=request.data.get('metodo_venta', ''),
             tasa_venta=data['tasa_venta'],

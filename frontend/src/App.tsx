@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { ArrowRightLeft, CheckCircle, Loader2, ArrowUpCircle } from 'lucide-react';
 import { applyUpdate, getUpdateProgress, fetchBcvRate, resetDatabaseSecure, saveLog, API_BASE_URL } from './api';
 import type { SavedCalculation, Wallet, Transaction, UpdateProgress } from './api';
@@ -53,19 +53,25 @@ function App() {
     localStorage.setItem('p2p_valor_ut', valorUt.toString());
   }, [valorUt]);
 
-  const showNotification = (message: string, type: 'success' | 'info' = 'success') => {
+  const notificationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showNotification = useCallback((message: string, type: 'success' | 'info' = 'success') => {
+    if (notificationTimerRef.current) clearTimeout(notificationTimerRef.current);
     setNotification({ message, type });
-    setTimeout(() => setNotification(null), 4000);
-  };
+    notificationTimerRef.current = setTimeout(() => setNotification(null), 4000);
+  }, []);
 
   const appData = useAppData();
   const calc = useCalculator();
-  const logbook = useLogbook(appData.logs, () => appData.loadData(tasaBcv));
+  const logbook = useLogbook(appData.logs, () => appData.loadData(tasaBcvRef.current));
   const portfolio = usePortfolio(
     appData.wallets,
     appData.transactions,
-    () => appData.loadData(tasaBcv),
+    () => appData.loadData(tasaBcvRef.current),
   );
+
+  const tasaBcvRef = useRef(tasaBcv);
+  tasaBcvRef.current = tasaBcv;
 
   useEffect(() => {
     appData.loadData(tasaBcv).then(() => setIsLoading(false));
@@ -76,7 +82,7 @@ function App() {
       } catch { /* ignore */ }
     };
     autoFetchBcv();
-    const interval = setInterval(() => appData.loadData(tasaBcv), 30000);
+    const interval = setInterval(() => appData.loadData(tasaBcvRef.current), 30000);
     return () => clearInterval(interval);
   }, []);
 
@@ -153,7 +159,11 @@ function App() {
 
   const handleResetSystem = async () => {
     if (!confirm('¿Estas seguro de que deseas restablecer por completo el sistema? Esto eliminara permanentemente todas las billeteras, movimientos, bitacoras e historial.')) return;
-    try { await resetDatabaseSecure(); } catch { /* ignore */ }
+    try {
+      await resetDatabaseSecure();
+    } catch {
+      showNotification('Error al restablecer el servidor. Los datos locales se eliminaran de todas formas.', 'info');
+    }
     localStorage.clear();
     window.location.reload();
   };

@@ -1502,6 +1502,18 @@ body {
   color: var(--text-muted);
 }
 
+.text-center {
+  text-align: center;
+}
+
+.font-bold {
+  font-weight: 700;
+}
+
+.font-small {
+  font-size: 0.85rem;
+}
+
 .wallet-meta-container {
   display: flex;
   flex-direction: column;

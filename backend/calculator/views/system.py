@@ -1,5 +1,6 @@
 import os
 import sys
+import logging
 import json
 import shutil
 import hashlib
@@ -10,15 +11,31 @@ import threading
 import time
 from pathlib import Path
 from datetime import datetime, date, timedelta
+from django.utils import timezone
 import requests
 from bs4 import BeautifulSoup
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from django.db import transaction as db_transaction
 
 from calculator.models import Calculation, DailyLog, Wallet, Transaction
 from calculator.auth import _check_auth, _get_secret_token
 from calculator.utils import _get_data_dir, load_json, parse_version
+
+logger = logging.getLogger('calculator')
+
+
+def _resolve_data_path():
+    if getattr(sys, 'frozen', False):
+        return Path(sys.executable).parent
+    return Path(__file__).resolve().parent.parent.parent
+
+
+def _resolve_base_path():
+    if getattr(sys, 'frozen', False):
+        return Path(sys._MEIPASS)
+    return Path(__file__).resolve().parent.parent.parent.parent
 
 
 @api_view(['GET'])
@@ -32,12 +49,14 @@ def get_bcv_rate(request):
     
     # 1. Read existing cache
     cache_data = load_json(cache_path, None)
-    now = datetime.now()
+    now = timezone.now()
     
     # Try to use valid cache (less than 6 hours old)
     if cache_data:
         try:
             last_updated = datetime.fromisoformat(cache_data.get('last_updated', ''))
+            if last_updated.tzinfo is None:
+                last_updated = timezone.make_aware(last_updated)
             if now - last_updated < timedelta(hours=6):
                 return Response({
                     'rate': cache_data['rate'],
@@ -148,20 +167,14 @@ def reset_database(request):
         return Response({'error': f'Error al restablecer la base de datos: {str(e)}'}, status=500)
 
 
+reset_database.throttle_classes = [ScopedRateThrottle]
+reset_database.throttle_scope = 'reset-db'
+
+
 @api_view(['GET'])
 def check_update(request):
-    def get_data_path():
-        if getattr(sys, 'frozen', False):
-            return Path(sys.executable).parent
-        return Path(__file__).resolve().parent.parent.parent
-
-    def get_base_path():
-        if getattr(sys, 'frozen', False):
-            return Path(sys._MEIPASS)
-        return Path(__file__).resolve().parent.parent.parent.parent
-
-    DATA_DIR = get_data_path()
-    BASE_DIR = get_base_path()
+    DATA_DIR = _resolve_data_path()
+    BASE_DIR = _resolve_base_path()
 
     def load_update_state():
         state_path = DATA_DIR / 'update_state.json'
@@ -440,23 +453,16 @@ def apply_update(request):
     if not _check_auth(request):
         return Response({'error': 'Autenticacion requerida. Envie Authorization: Bearer <token>'}, status=401)
 
-    # Check if update is already running
+    # Check if update is already running (atomic check-and-set)
     with update_status_lock:
         if update_status["status"] in ["downloading", "verifying", "extracting"]:
             return Response({'status': 'running', 'message': 'Actualizacion ya esta en progreso'})
+        update_status["status"] = "starting"
+        update_status["progress"] = 0
+        update_status["error_message"] = None
 
-    def get_data_path():
-        if getattr(sys, 'frozen', False):
-            return Path(sys.executable).parent
-        return Path(__file__).resolve().parent.parent.parent
-
-    def get_base_path():
-        if getattr(sys, 'frozen', False):
-            return Path(sys._MEIPASS)
-        return Path(__file__).resolve().parent.parent.parent.parent
-
-    DATA_DIR = get_data_path()
-    BASE_DIR = get_base_path()
+    DATA_DIR = _resolve_data_path()
+    BASE_DIR = _resolve_base_path()
 
     local_version_file = load_json(DATA_DIR / 'version.json', None)
     if local_version_file is None:
@@ -525,6 +531,10 @@ def apply_update(request):
     thread.start()
 
     return Response({'success': True, 'status': 'started', 'message': 'Actualizacion iniciada en segundo plano'})
+
+
+apply_update.throttle_classes = [ScopedRateThrottle]
+apply_update.throttle_scope = 'update-apply'
 
 
 @api_view(['GET'])

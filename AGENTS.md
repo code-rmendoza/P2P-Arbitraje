@@ -34,7 +34,6 @@ Both must run simultaneously. Frontend falls back to localStorage when backend i
 | Frontend lint | `pnpm lint` (uses oxlint, not eslint) |
 | Run Django migrations | `python manage.py migrate` (in `backend/`) |
 | Run Django tests | `python manage.py test calculator` |
-| Create superuser | `python manage.py createsuperuser` |
 | Build portable .exe | `build.bat` (from project root) |
 
 Frontend build uses `tsc -b && vite build`. Frontend test suite runs with Vitest (`pnpm test`).
@@ -46,7 +45,6 @@ Frontend build uses `tsc -b && vite build`. Frontend test suite runs with Vitest
 - Single Django app: `calculator/`
 - REST API mounted at `api/` (`p2p_project/urls.py:22`)
 - SQLite database at `backend/db.sqlite3`
-- Configured Ruff and Black settings inside `backend/pyproject.toml`
 - View layers modularized inside sub-package `calculator/views/` (calculations.py, portfolio.py, logs.py, system.py)
 
 **Models** (`calculator/models.py`):
@@ -58,8 +56,18 @@ Frontend build uses `tsc -b && vite build`. Frontend test suite runs with Vitest
 **Key endpoints** (`calculator/urls.py`):
 - `POST api/calculate/` — stateless P2P math using Decimal values
 - `GET api/bcv-rate/` — scrapes BCV website for USD rate with a 6-hour disk caching system
-- `POST api/reset-db/` — destructive: wipes all tables in a safe, transaction-bound sequence (requires Bearer token authentication)
+- `POST api/reset-db/` — destructive: wipes all tables in a safe, transaction-bound sequence (requires Bearer token, rate limited 3/hour)
+- `GET api/update-check/` — checks GitHub for new releases (rate limit: 10/day)
+- `POST api/update-apply/` — downloads and applies update (requires Bearer token, rate limited 5/hour)
+- `GET api/update-progress/` — returns current update status/progress
+- `GET api/auth-token/` — returns secret token (dev mode only, localhost only)
+- `GET api/version/` — returns current version from version.json
 - CRUD: `api/history/`, `api/logs/`, `api/wallets/`, `api/transactions/`
+
+**Serializers** (`calculator/serializers.py`):
+- `DailyLogSerializer` validates: volume >= 0, profit >= 0, date required
+- `WalletSerializer` validates: hex color regex, unique identity (name+platform+currency) at serializer level
+- `TransactionSerializer`: read-only wallet name/platform/currency fields
 
 ### Frontend (`frontend/`)
 
@@ -69,6 +77,7 @@ Frontend build uses `tsc -b && vite build`. Frontend test suite runs with Vitest
   - `src/hooks/useWalletForm.ts` — Wallet creation/editing modals
   - `src/hooks/usePortfolio.ts` — acts as the orchestrator facade
 - API layer: `src/api/` — split into specific modules (wallets.ts, transactions.ts, logs.ts, calculations.ts, client.ts) with active error propagation (throws true HTTP errors) and TypeError local fallback
+- All API functions use `authFetch` from `client.ts` for authenticated requests (including read operations)
 - Layout: Components are styled using CSS classes defined in `src/index.css` (no inline style objects)
 - Linter: oxlint (not eslint) — config at `.oxlintrc.json`
 - Build: `tsc -b && vite build`
@@ -77,14 +86,17 @@ Frontend build uses `tsc -b && vite build`. Frontend test suite runs with Vitest
 
 - **Transactions are immutable after create**: `TransactionViewSet.update` returns 405. Must delete and recreate.
 - **Transaction delete reverses wallet balances** — atomic with delete in a DB transaction.
-- **Unique Wallet constraints**: Unique together constraint on `(name, platform, currency)`. Serializer create enforces it directly via DB validations, returning `400 Bad Request` if duplicate.
+- **Unique Wallet constraints**: Unique together constraint on `(name, platform, currency)`. Serializer enforces it, returning `400 Bad Request` if duplicate.
 - **DailyLog accumulation**: when `accumulate: true` on log creation, backend locks the database row (`select_for_update`) and accumulates profit, volume, and comments inside an atomic transaction block.
 - **Offline mode**: every API function has a localStorage fallback. `isOnline` state toggles the badge.
-- **`get_bcv_rate` caching**: Caches scraped rate in `bcv_rate_cache.json` for 6 hours. If scraping fails (connection issues, SSL errors, HTML changes), it falls back to expired cached rate or a hardcoded contingency rate of `36.50`.
-- **Timing attack protection**: Authentication comparison uses `hmac.compare_digest` to prevent timing side-channel attacks.
-- **Secure Token injection**: `run_server.py` in production Waitress mode automatically injects `window.__P2P_TOKEN__` script block into `index.html` on delivery, removing bootstrap auth token network calls.
-- **Precision**: All financial view backend calculations are done using Python's `Decimal` class, avoiding float precision errors. Redundant calculations unifications done via client-side `currency.ts amountToUsdt` and backend views.
-- **Frontend test suite**: Written using Vitest (`pnpm test` or `pnpm test:watch` in `frontend/`). Backend has `calculator/tests.py` containing 24 tests (covers updates, constraints, logs, fallbacks, and deletion consistency).
+- **`get_bcv_rate` caching**: Caches scraped rate in `bcv_rate_cache.json` for 6 hours. If scraping fails, falls back to expired cache or hardcoded 36.50 contingency.
+- **Timing attack protection**: Authentication comparison uses `hmac.compare_digest`.
+- **Rate limiting**: `reset-db/` (3/hour), `update-apply/` (5/hour) use `ScopedRateThrottle`. `update-check/` has 10 checks/day in code.
+- **Precision**: All financial calculations use Python `Decimal`. Frontend normalizes all API Decimal fields via `Number()` in each API module.
+- **Date parsing**: All `log.date` values are strings (`YYYY-MM-DD`). Parse with `new Date(log.date)` — do NOT append `T00:00:00` (causes timezone offset issues).
+- **Frontend test suite**: Vitest (`pnpm test`). Backend: `calculator/tests.py` with 40 tests (covers validation, constraints, auth, updates, fallbacks, transactions, system endpoints).
+- **Serializers validate at write time**: DailyLog checks volume/profit >= 0, Wallet checks hex color and unique identity.
+- **Logging**: Django LOGGING configured for `calculator` (INFO) and `django.request` (WARNING) to console.
 
 ## Auto-Update System
 
@@ -118,6 +130,6 @@ During updates, the system downloads both the `P2P_Arbitrage.zip` and `P2P_Arbit
 ## Conventions
 
 - Spanish domain terminology throughout (models, UI, comments)
-- Backend: standard Django/DRF patterns, no custom auth
+- Backend: standard Django/DRF patterns, token-based auth via `calculator/auth.py`
 - Frontend: no state management library, all state in App component via useState/useEffect
 - Frontend uses `lucide-react` for icons

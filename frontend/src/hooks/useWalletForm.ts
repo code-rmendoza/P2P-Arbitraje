@@ -51,6 +51,7 @@ export function useWalletForm(loadData: () => Promise<void>) {
 
   const handleSaveWallet = async (notify: (msg: string) => void) => {
     if (!walletForm.name.trim() || !walletForm.platform.trim()) return;
+    const wasEditing = !!editingWalletId;
     try {
       await saveWallet({
         id: editingWalletId ?? editingWallet?.id,
@@ -61,7 +62,7 @@ export function useWalletForm(loadData: () => Promise<void>) {
       setIsWalletModalOpen(false);
       resetWalletForm();
       await loadData();
-      notify(editingWalletId ? 'Billetera actualizada' : 'Billetera creada');
+      notify(wasEditing ? 'Billetera actualizada' : 'Billetera creada');
     } catch (error: any) {
       alert(error.message || 'No se pudo guardar la billetera.');
     }

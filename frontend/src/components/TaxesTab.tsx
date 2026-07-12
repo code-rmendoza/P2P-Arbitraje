@@ -24,7 +24,7 @@ export function TaxesTab({
   transactions,
 }: TaxesTabProps) {
   const currentYearFiscalLogs = logs.filter(log => {
-    const d = new Date(log.date + 'T00:00:00');
+    const d = new Date(log.date);
     return d.getFullYear() === year && log.tipo_operativa === 'VES';
   });
 
@@ -101,7 +101,7 @@ export function TaxesTab({
   const taxOwedUsdt = tasaBcv > 0 ? taxOwedBoli / tasaBcv : 0;
 
   const usdOnlyLogs = logs.filter(log => {
-    const d = new Date(log.date + 'T00:00:00');
+    const d = new Date(log.date);
     return d.getFullYear() === year && log.tipo_operativa === 'USD';
   });
   const yearUsdProfitTotal = usdOnlyLogs.reduce((sum, log) => sum + log.profit, 0);

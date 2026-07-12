@@ -108,7 +108,7 @@ export function calculateTargetBuyPrices(sellingPrice: number, commissionPercent
 
 export async function fetchCalculations(): Promise<SavedCalculation[]> {
   try {
-    const response = await fetch(`${API_BASE_URL}/history/`);
+    const response = await authFetch(`${API_BASE_URL}/history/`);
     if (!response.ok) throw new Error('Error al obtener historial del servidor');
     const data: SavedCalculation[] = await response.json();
     const normalized = data.map(c => ({

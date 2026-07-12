@@ -92,8 +92,12 @@ export function useCalculator() {
 
   const handleDeleteSimulation = async (id: number): Promise<boolean> => {
     if (confirm('¿Estás seguro de que deseas eliminar esta simulación?')) {
-      await deleteCalculation(id);
-      return true;
+      try {
+        await deleteCalculation(id);
+        return true;
+      } catch {
+        return false;
+      }
     }
     return false;
   };
@@ -134,11 +138,13 @@ Ganancia Proyectada al Mes: $${calculationResult.ganancia_mensual.toFixed(2)} US
 `;
     const element = document.createElement('a');
     const file = new Blob([content], { type: 'text/plain' });
-    element.href = URL.createObjectURL(file);
+    const blobUrl = URL.createObjectURL(file);
+    element.href = blobUrl;
     element.download = `P2P_Simulacion_${tipoOperativa}_${capital}USDT.txt`;
     document.body.appendChild(element);
     element.click();
     document.body.removeChild(element);
+    URL.revokeObjectURL(blobUrl);
   };
 
   const defaultLabel = `Simulacion ${tipoOperativa} - Cap: ${capital} - ${metodoCompra} a ${metodoVenta}`;

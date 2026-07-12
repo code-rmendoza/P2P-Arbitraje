@@ -501,3 +501,203 @@ class SecurityDevOpsTests(APITestCase):
         self.assertEqual(resp.data['rate'], 36.50)
         self.assertTrue(resp.data['fallback_contingency'])
         self.assertIn('warning', resp.data)
+
+
+class TransactionValidationTests(APITestCase):
+    """Tests for additional transaction validation rules."""
+    def setUp(self):
+        self.token = _get_secret_token()
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.token}')
+        self.w1 = Wallet.objects.create(name='W1', platform='P', currency='USDT', balance=Decimal('100.00'))
+        self.w2 = Wallet.objects.create(name='W2', platform='P', currency='USD', balance=Decimal('50.00'))
+        self.url = reverse('transaction-list')
+
+    def test_update_returns_405(self):
+        tx = Transaction.objects.create(
+            date=timezone.now(), type='TRANSFERENCIA',
+            wallet_from=self.w1, wallet_to=self.w2,
+            amount_out=10, amount_in=10, rate=1, commission_pct=0,
+        )
+        resp = self.client.put(reverse('transaction-detail', args=[tx.id]), {
+            'date': timezone.now().isoformat(),
+            'type': 'TRANSFERENCIA',
+            'wallet_from': self.w1.id,
+            'wallet_to': self.w2.id,
+            'amount_out': 20, 'amount_in': 20, 'rate': 1, 'commission_pct': 0,
+        }, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    def test_partial_update_returns_405(self):
+        tx = Transaction.objects.create(
+            date=timezone.now(), type='TRANSFERENCIA',
+            wallet_from=self.w1, wallet_to=self.w2,
+            amount_out=10, amount_in=10, rate=1, commission_pct=0,
+        )
+        resp = self.client.patch(reverse('transaction-detail', args=[tx.id]), {
+            'amount_out': 20,
+        }, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    def test_same_wallet_rejected(self):
+        resp = self.client.post(self.url, {
+            'date': timezone.now().isoformat(),
+            'type': 'TRANSFERENCIA',
+            'wallet_from': self.w1.id,
+            'wallet_to': self.w1.id,
+            'amount_out': 10, 'amount_in': 10, 'rate': 1, 'commission_pct': 0,
+        }, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_no_wallets_rejected(self):
+        resp = self.client.post(self.url, {
+            'date': timezone.now().isoformat(),
+            'type': 'TRANSFERENCIA',
+            'wallet_from': None,
+            'wallet_to': None,
+            'amount_out': 0, 'amount_in': 0, 'rate': 1, 'commission_pct': 0,
+        }, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_negative_amounts_rejected(self):
+        resp = self.client.post(self.url, {
+            'date': timezone.now().isoformat(),
+            'type': 'TRANSFERENCIA',
+            'wallet_from': self.w1.id,
+            'wallet_to': self.w2.id,
+            'amount_out': -5, 'amount_in': 10, 'rate': 1, 'commission_pct': 0,
+        }, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_deposito_without_wallet_from(self):
+        resp = self.client.post(self.url, {
+            'date': timezone.now().isoformat(),
+            'type': 'DEPOSITO',
+            'wallet_from': None,
+            'wallet_to': self.w1.id,
+            'amount_out': 0, 'amount_in': 50, 'rate': 1, 'commission_pct': 0,
+        }, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+
+    def test_deposito_with_wallet_from_rejected(self):
+        resp = self.client.post(self.url, {
+            'date': timezone.now().isoformat(),
+            'type': 'DEPOSITO',
+            'wallet_from': self.w1.id,
+            'wallet_to': self.w2.id,
+            'amount_out': 10, 'amount_in': 10, 'rate': 1, 'commission_pct': 0,
+        }, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_retiro_without_wallet_to(self):
+        resp = self.client.post(self.url, {
+            'date': timezone.now().isoformat(),
+            'type': 'RETIRO',
+            'wallet_from': self.w1.id,
+            'wallet_to': None,
+            'amount_out': 10, 'amount_in': 0, 'rate': 1, 'commission_pct': 0,
+        }, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+
+    def test_retiro_with_wallet_to_rejected(self):
+        resp = self.client.post(self.url, {
+            'date': timezone.now().isoformat(),
+            'type': 'RETIRO',
+            'wallet_from': self.w1.id,
+            'wallet_to': self.w2.id,
+            'amount_out': 10, 'amount_in': 10, 'rate': 1, 'commission_pct': 0,
+        }, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_p2p_requires_both_wallets(self):
+        resp = self.client.post(self.url, {
+            'date': timezone.now().isoformat(),
+            'type': 'VENTA_P2P',
+            'wallet_from': self.w1.id,
+            'wallet_to': None,
+            'amount_out': 10, 'amount_in': 0, 'rate': 1, 'commission_pct': 0,
+        }, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class SystemEndpointTests(APITestCase):
+    """Tests for system utility endpoints."""
+    def test_get_version(self):
+        resp = self.client.get(reverse('version'))
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertIn('version', resp.data)
+
+    def test_get_auth_token_dev_mode(self):
+        from django.conf import settings
+        old_debug = settings.DEBUG
+        try:
+            settings.DEBUG = True
+            resp = self.client.get(reverse('auth-token'), HTTP_HOST='localhost')
+            self.assertEqual(resp.status_code, status.HTTP_200_OK)
+            self.assertIn('token', resp.data)
+        finally:
+            settings.DEBUG = old_debug
+
+    def test_get_auth_token_production_blocked(self):
+        from django.conf import settings
+        old_debug = settings.DEBUG
+        try:
+            settings.DEBUG = False
+            resp = self.client.get(reverse('auth-token'), HTTP_HOST='localhost')
+            self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+        finally:
+            settings.DEBUG = old_debug
+
+    @patch('requests.get')
+    def test_apply_update_rejects_same_version(self, mock_get):
+        from calculator.utils import _get_data_dir, load_json, parse_version
+        token = _get_secret_token()
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token}')
+
+        # Read current version
+        data_dir = _get_data_dir()
+        vf = load_json(data_dir / 'version.json', None)
+        if vf is None:
+            from pathlib import Path
+            vf = load_json(Path(__file__).resolve().parent.parent.parent / 'version.json', {'version': '0.0.0'})
+        current_ver = vf.get('version', '0.0.0')
+
+        class MockReleaseResponse:
+            status_code = 200
+            def json(self):
+                import struct
+                suffix = "_x64" if struct.calcsize("P") * 8 == 64 else "_x86"
+                return {
+                    "tag_name": f"v{current_ver}",
+                    "assets": [{"name": f"P2P_Arbitrage{suffix}.zip", "browser_download_url": f"https://github.com/code-rmendoza/P2P-Arbitraje/releases/download/v{current_ver}/P2P_Arbitrage{suffix}.zip"}]
+                }
+
+        mock_get.return_value = MockReleaseResponse()
+        resp = self.client.post(reverse('update-apply'))
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    @patch('requests.get')
+    def test_check_update_rate_limit(self, mock_get):
+        from calculator.utils import _get_data_dir
+        token = _get_secret_token()
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token}')
+
+        class MockReleaseResponse:
+            status_code = 200
+            def json(self):
+                return {"tag_name": "v99.0.0", "assets": []}
+
+        mock_get.return_value = MockReleaseResponse()
+
+        # Exhaust rate limit (10 checks/day)
+        for _ in range(10):
+            self.client.get(reverse('update-check'))
+
+        # 11th should be rate limited
+        resp = self.client.get(reverse('update-check'))
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertTrue(resp.data.get('rate_limited'))
+
+        # Reset state for other tests
+        import json
+        state_path = _get_data_dir() / 'update_state.json'
+        state_path.write_text(json.dumps({"last_check_date": "", "checks_today": 0}))

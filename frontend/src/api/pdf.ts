@@ -54,7 +54,7 @@ export function exportPortfolioPDF(data: PortfolioData) {
   }
 
   // Transactions table (last 20)
-  const recentTxs = transactions
+  const recentTxs = [...transactions]
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     .slice(0, 20);
 

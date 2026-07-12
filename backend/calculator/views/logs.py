@@ -1,6 +1,7 @@
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from django.db import transaction as db_transaction
+from decimal import Decimal, InvalidOperation
 
 from calculator.models import DailyLog
 from calculator.serializers import DailyLogSerializer
@@ -20,12 +21,17 @@ class DailyLogViewSet(viewsets.ModelViewSet):
             tipo_operativa = request.data.get('tipo_operativa', 'USD')
             metodo_compra = request.data.get('metodo_compra', 'Zinli')
             metodo_venta = request.data.get('metodo_venta', 'Zinli')
-            profit = float(request.data.get('profit', 0.0))
-            volume = float(request.data.get('volume', 0.0))
+            try:
+                profit = Decimal(str(request.data.get('profit', 0)))
+                volume = Decimal(str(request.data.get('volume', 0)))
+            except (InvalidOperation, TypeError, ValueError):
+                return Response(
+                    {"error": "Los valores de profit y volume deben ser numericos validos."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
             notes = request.data.get('notes', '').strip()
 
             with db_transaction.atomic():
-                # Buscar registro existente para el mismo día, operativa y ruta
                 existing = DailyLog.objects.select_for_update().filter(
                     date=date_val,
                     tipo_operativa=tipo_operativa,
@@ -34,8 +40,8 @@ class DailyLogViewSet(viewsets.ModelViewSet):
                 ).first()
 
                 if existing:
-                    existing.profit = float(existing.profit) + profit
-                    existing.volume = float(existing.volume) + volume
+                    existing.profit = existing.profit + profit
+                    existing.volume = existing.volume + volume
                     if notes:
                         if existing.notes:
                             existing.notes = (existing.notes + "\n" + notes).strip()

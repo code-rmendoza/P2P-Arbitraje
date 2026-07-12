@@ -122,9 +122,13 @@ export function useTransactionForm(
   const handleDeleteTransaction = async (tx: Transaction, notify: (msg: string) => void) => {
     if (!tx.id || !confirm('¿Eliminar este movimiento y revertir saldos?')) return;
 
-    await deleteTransaction(tx.id);
-    await loadData();
-    notify('Movimiento eliminado y saldos revertidos');
+    try {
+      await deleteTransaction(tx.id);
+      await loadData();
+      notify('Movimiento eliminado y saldos revertidos');
+    } catch (error: any) {
+      alert(error.message || 'No se pudo eliminar el movimiento.');
+    }
   };
 
   return {
