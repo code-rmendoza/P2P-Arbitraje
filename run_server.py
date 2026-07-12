@@ -52,7 +52,7 @@ settings.CORS_ALLOW_ALL_ORIGINS = False
 
 django.setup()
 
-# Verify critical columns exist; if not, reset their migration record so migrate re-applies
+# Repair missing columns directly via SQL (bypasses broken migration state)
 try:
     import sqlite3 as _sqlite3
     _db_path = str(DATA_DIR / 'db.sqlite3')
@@ -60,12 +60,11 @@ try:
         _conn = _sqlite3.connect(_db_path)
         _cursor = _conn.execute("PRAGMA table_info(calculator_transaction)")
         _cols = {row[1] for row in _cursor.fetchall()}
-        _conn.close()
         if 'category' not in _cols:
-            _conn = _sqlite3.connect(_db_path)
+            _conn.execute("ALTER TABLE calculator_transaction ADD COLUMN category VARCHAR(50) NULL")
             _conn.execute("DELETE FROM django_migrations WHERE app='calculator' AND name LIKE '0009%'")
             _conn.commit()
-            _conn.close()
+        _conn.close()
 except Exception:
     pass
 
