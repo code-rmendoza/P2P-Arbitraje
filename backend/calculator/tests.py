@@ -357,8 +357,19 @@ class SecurityDevOpsTests(APITestCase):
         mock_get.side_effect = side_effect
 
         resp = self.client.post(reverse('update-apply'))
-        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn('Falta firma digital', resp.data['error'])
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        
+        # Poll progress endpoint for the error
+        import time
+        error_found = False
+        for _ in range(50):
+            time.sleep(0.05)
+            progress_resp = self.client.get(reverse('update-progress'))
+            if progress_resp.data['status'] == 'error':
+                self.assertIn('Falta firma digital', progress_resp.data['error_message'])
+                error_found = True
+                break
+        self.assertTrue(error_found)
 
     @patch('requests.get')
     def test_apply_update_invalid_checksum(self, mock_get):
@@ -402,8 +413,19 @@ class SecurityDevOpsTests(APITestCase):
         mock_get.side_effect = side_effect
 
         resp = self.client.post(reverse('update-apply'))
-        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn('Violacion de integridad', resp.data['error'])
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        
+        # Poll progress endpoint for the error
+        import time
+        error_found = False
+        for _ in range(50):
+            time.sleep(0.05)
+            progress_resp = self.client.get(reverse('update-progress'))
+            if progress_resp.data['status'] == 'error':
+                self.assertIn('Violacion de integridad', progress_resp.data['error_message'])
+                error_found = True
+                break
+        self.assertTrue(error_found)
 
     @patch('requests.get')
     def test_check_update_matches_architecture(self, mock_get):

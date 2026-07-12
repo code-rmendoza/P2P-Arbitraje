@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { ArrowRightLeft, CheckCircle, Loader2 } from 'lucide-react';
-import { applyUpdate, fetchBcvRate, resetDatabaseSecure, saveLog } from './api';
-import type { SavedCalculation, Wallet, Transaction } from './api';
+import { ArrowRightLeft, CheckCircle, Loader2, ArrowUpCircle } from 'lucide-react';
+import { applyUpdate, getUpdateProgress, fetchBcvRate, resetDatabaseSecure, saveLog, API_BASE_URL } from './api';
+import type { SavedCalculation, Wallet, Transaction, UpdateProgress } from './api';
 
 import { useAppData } from './hooks/useAppData';
 import { useCalculator } from './hooks/useCalculator';
@@ -23,6 +23,8 @@ function App() {
   const [activeTab, setActiveTab] = useState<'operative' | 'buy_prices' | 'portfolio' | 'logbook' | 'taxes'>('operative');
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
   const [updating, setUpdating] = useState<boolean>(false);
+  const [updateProgress, setUpdateProgress] = useState<UpdateProgress | null>(null);
+  const [reconnecting, setReconnecting] = useState<boolean>(false);
   const [isFetchingBcv, setIsFetchingBcv] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [tasaBcv, setTasaBcv] = useState<number>(() => {
@@ -79,18 +81,58 @@ function App() {
   }, []);
 
   const handleApplyUpdate = async () => {
-    if (!confirm('Se descargara y aplicara la nueva version. El servidor se reiniciara. Continuar?')) return;
+    if (!confirm('Se descargará y aplicará la nueva versión. El servidor se reiniciará. ¿Continuar?')) return;
     setUpdating(true);
+    setUpdateProgress({ status: 'downloading', progress: 0, error_message: null });
+
     try {
       const result = await applyUpdate();
-      if (result?.success) {
-        alert(result.message + '\nEl navegador se reconectara en unos segundos...');
-      } else {
-        alert('Error al aplicar actualizacion');
+      if (!result || !result.success) {
+        setUpdateProgress({ status: 'error', progress: 0, error_message: 'No se pudo iniciar la descarga de actualización.' });
         setUpdating(false);
+        return;
       }
+
+      const pollInterval = setInterval(async () => {
+        try {
+          const prog = await getUpdateProgress();
+          if (prog) {
+            setUpdateProgress(prog);
+
+            if (prog.status === 'ready') {
+              clearInterval(pollInterval);
+              setReconnecting(true);
+              
+              // Wait 4 seconds for the server to stop, then poll availability
+              setTimeout(() => {
+                const reconnectInterval = setInterval(async () => {
+                  try {
+                    const testResp = await fetch(`${API_BASE_URL}/update-check/`);
+                    if (testResp.ok) {
+                      clearInterval(reconnectInterval);
+                      setReconnecting(false);
+                      setUpdating(false);
+                      setUpdateProgress(null);
+                      alert('¡Actualización aplicada con éxito! La aplicación se recargará automáticamente.');
+                      window.location.reload();
+                    }
+                  } catch {
+                    // Keep trying
+                  }
+                }, 2000);
+              }, 4000);
+            } else if (prog.status === 'error') {
+              clearInterval(pollInterval);
+              setUpdating(false);
+            }
+          }
+        } catch {
+          // Ignore network errors during restart window
+        }
+      }, 800);
+
     } catch {
-      alert('Error de conexion al actualizar');
+      setUpdateProgress({ status: 'error', progress: 0, error_message: 'Error de conexión al iniciar actualización.' });
       setUpdating(false);
     }
   };
@@ -427,6 +469,55 @@ function App() {
         onSave={handleSaveNewOperation}
         onDeleteLog={handleDeleteLogItem}
       />
+
+      {updateProgress && (
+        <div style={{
+          position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.75)',
+          backdropFilter: 'blur(8px)', display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center', zIndex: 10000, padding: '2rem'
+        }}>
+          <div className="card" style={{ maxWidth: '480px', width: '100%', padding: '2rem', textAlign: 'center', boxShadow: 'var(--shadow-2xl)', border: '1px solid var(--border-color)' }}>
+            <ArrowUpCircle style={{ width: '3.5rem', height: '3.5rem', color: 'var(--color-primary)', margin: '0 auto 1.5rem', animation: updateProgress.status !== 'error' && updateProgress.status !== 'ready' ? 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' : 'none' }} />
+            
+            <h3 className="card-title" style={{ fontSize: '1.25rem', marginBottom: '0.75rem' }}>
+              {reconnecting ? 'Reiniciando Servidor...' : 'Actualizando Aplicación'}
+            </h3>
+            
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
+              {updateProgress.status === 'downloading' && `Descargando archivos de actualización: ${updateProgress.progress}%`}
+              {updateProgress.status === 'verifying' && 'Verificando firma digital y firmas de seguridad (SHA-256)...'}
+              {updateProgress.status === 'extracting' && 'Extrayendo paquete de actualización...'}
+              {updateProgress.status === 'ready' && 'Instalando archivos y reiniciando servidor...'}
+              {updateProgress.status === 'error' && `Error: ${updateProgress.error_message}`}
+            </p>
+
+            {updateProgress.status !== 'error' && (
+              <div style={{ width: '100%', height: '8px', backgroundColor: 'var(--border-color)', borderRadius: '9999px', overflow: 'hidden', marginBottom: '1rem' }}>
+                <div style={{
+                  width: `${updateProgress.status === 'downloading' ? updateProgress.progress : 100}%`,
+                  height: '100%',
+                  backgroundColor: reconnecting ? 'var(--color-success)' : 'var(--color-primary)',
+                  transition: 'width 0.3s ease-out',
+                  borderRadius: '9999px',
+                }} />
+              </div>
+            )}
+
+            {reconnecting && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', color: 'var(--color-success)', fontSize: '0.85rem', fontWeight: 600 }}>
+                <Loader2 style={{ width: '1rem', height: '1rem', animation: 'spin 1s linear infinite' }} />
+                <span>Intentando reconectar...</span>
+              </div>
+            )}
+
+            {updateProgress.status === 'error' && (
+              <button className="btn btn-primary" onClick={() => { setUpdateProgress(null); setUpdating(false); }} style={{ marginTop: '0.5rem' }}>
+                Cerrar
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

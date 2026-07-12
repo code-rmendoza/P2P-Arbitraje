@@ -259,10 +259,191 @@ def check_update(request):
         })
 
 
+# Thread-safe status tracker for updates
+update_status = {
+    "status": "idle",       # idle, downloading, verifying, extracting, ready, error
+    "progress": 0,          # 0 to 100
+    "error_message": None
+}
+update_status_lock = threading.Lock()
+
+def set_update_status(status, progress=0, error_message=None):
+    with update_status_lock:
+        update_status["status"] = status
+        update_status["progress"] = progress
+        update_status["error_message"] = error_message
+
+
+def run_update_in_background(download_url, zip_name, assets, tag, DATA_DIR, BASE_DIR):
+    try:
+        set_update_status("downloading", 0)
+        
+        tmp_dir = Path(tempfile.mkdtemp(prefix="p2p_update_"))
+        zip_path = tmp_dir / "update.zip"
+        
+        # Download with progress tracking
+        resp = requests.get(download_url, stream=True, timeout=120)
+        resp.raise_for_status()
+        total_size = int(resp.headers.get('content-length', 0)) if hasattr(resp, 'headers') else 0
+        downloaded = 0
+        
+        with open(zip_path, 'wb') as f:
+            for chunk in resp.iter_content(chunk_size=16384):
+                f.write(chunk)
+                downloaded += len(chunk)
+                if total_size > 0:
+                    percent = int((downloaded / total_size) * 100)
+                    percent = min(100, max(0, percent))
+                    set_update_status("downloading", percent)
+                else:
+                    set_update_status("downloading", 50)
+                    
+        # Verify SHA256 Checksum
+        set_update_status("verifying", 100)
+        sha256_url = None
+        expected_sha256_name = zip_name + ".sha256" if zip_name else ""
+        for asset in assets:
+            if asset.get("name") == expected_sha256_name:
+                sha256_url = asset.get("browser_download_url")
+                break
+
+        if not sha256_url:
+            raise Exception(f"Falta firma digital (.sha256) para el archivo {zip_name or 'de actualizacion'}.")
+
+        sha_resp = requests.get(sha256_url, timeout=10)
+        sha_resp.raise_for_status()
+        expected_hash = sha_resp.text.strip().split()[0].lower()
+
+        sha256_hash = hashlib.sha256()
+        with open(zip_path, "rb") as f:
+            for byte_block in iter(lambda: f.read(4096), b""):
+                sha256_hash.update(byte_block)
+        calculated_hash = sha256_hash.hexdigest().lower()
+
+        if calculated_hash != expected_hash:
+            raise Exception("Violacion de integridad. El hash no coincide con el publicado.")
+
+        # Extract
+        set_update_status("extracting", 100)
+        extract_dir = tmp_dir / "extracted"
+        with zipfile.ZipFile(zip_path, 'r') as zf:
+            zf.extractall(extract_dir)
+
+        items = list(extract_dir.iterdir())
+        source_dir = items[0] if len(items) == 1 and items[0].is_dir() else extract_dir
+
+        app_dir = str(DATA_DIR).replace("'", "''")
+        src_dir = str(source_dir).replace("'", "''")
+
+        ps_script = f'''
+# Retraso inicial para dar tiempo a liberar locks de cierre de Django
+Start-Sleep -Seconds 2
+
+$appDir = '{app_dir}'
+$srcDir = '{src_dir}'
+
+Write-Host "Esperando cierre del proceso..."
+$maxWait = 30
+$waited = 0
+while ($waited -lt $maxWait) {{
+    $proc = Get-Process -Name "P2P_Arbitrage" -ErrorAction SilentlyContinue
+    if (-not $proc) {{ break }}
+    Start-Sleep -Seconds 1
+    $waited++
+}}
+
+Write-Host "Eliminando archivos anteriores..."
+Get-ChildItem -Path $appDir -Recurse -File | Where-Object {{
+    $_.FullName -notlike "*db.sqlite3*" -and
+    $_.FullName -notlike "*update_state.json*" -and
+    $_.FullName -notlike "*secret_key.json*" -and
+    $_.FullName -notlike "*auth_token.json*"
+}} | ForEach-Object {{
+    $filePath = $_.FullName
+    $tries = 0
+    while ($tries -lt 5) {{
+        try {{
+            Remove-Item -Path $filePath -Force -ErrorAction Stop
+            break
+        }} catch {{
+            $tries++
+            Start-Sleep -Seconds 1
+        }}
+    }}
+}}
+
+# Limpiar directorios vacios anteriores
+Get-ChildItem -Path $appDir -Recurse -Directory | Sort-Object -Property FullName -Descending | ForEach-Object {{
+    Remove-Item -Path $_.FullName -Force -ErrorAction SilentlyContinue
+}}
+
+# Funcion segura de copia con reintentos
+function Safe-CopyItem ($src, $dest) {{
+    $tries = 5
+    $count = 0
+    while ($count -lt $tries) {{
+        try {{
+            Copy-Item -Path $src -Destination $dest -Force -ErrorAction Stop
+            return
+        }} catch {{
+            $count++
+            if ($count -eq $tries) {{
+                Write-Warning "No se pudo copiar $src a $dest despues de $tries intentos."
+            }} else {{
+                Start-Sleep -Seconds 1
+            }}
+        }}
+    }}
+}}
+
+Write-Host "Copiando nuevos archivos..."
+Get-ChildItem -Path $srcDir -Recurse -File | ForEach-Object {{
+    $rel = $_.FullName.Substring($srcDir.Length).TrimStart('\\')
+    $dest = Join-Path $appDir $rel
+    $destDir = Split-Path $dest -Parent
+    if (-not (Test-Path $destDir)) {{ New-Item -ItemType Directory -Path $destDir -Force | Out-Null }}
+    Safe-CopyItem $_.FullName $dest
+}}
+
+Write-Host "Limpiando archivos temporales..."
+Remove-Item -Path (Split-Path $srcDir) -Recurse -Force -ErrorAction SilentlyContinue
+
+Write-Host "Iniciando P2P Arbitrage..."
+Start-Process -FilePath (Join-Path $appDir "P2P_Arbitrage.exe")
+
+Remove-Item -Path $PSCommandPath -Force -ErrorAction SilentlyContinue
+'''
+        updater_path = tmp_dir / "updater.ps1"
+        with open(updater_path, 'w', encoding='utf-8') as f:
+            f.write(ps_script)
+
+        subprocess.Popen(
+            ['powershell', '-ExecutionPolicy', 'Bypass', '-File', str(updater_path)],
+            creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0)
+        )
+
+        set_update_status("ready", 100)
+        
+        # Shutdown server after 2 seconds
+        def shutdown_server():
+            time.sleep(2)
+            sys.exit(0)
+            
+        threading.Thread(target=shutdown_server, daemon=True).start()
+
+    except Exception as e:
+        set_update_status("error", 0, str(e))
+
+
 @api_view(['POST'])
 def apply_update(request):
     if not _check_auth(request):
         return Response({'error': 'Autenticacion requerida. Envie Authorization: Bearer <token>'}, status=401)
+
+    # Check if update is already running
+    with update_status_lock:
+        if update_status["status"] in ["downloading", "verifying", "extracting"]:
+            return Response({'status': 'running', 'message': 'Actualizacion ya esta en progreso'})
 
     def get_data_path():
         if getattr(sys, 'frozen', False):
@@ -299,7 +480,7 @@ def apply_update(request):
         data = resp.json()
         tag = data.get("tag_name", "")
         assets = data.get("assets", [])
-        # Detect active Python architecture/bitness
+        
         import struct
         is_64bit = struct.calcsize("P") * 8 == 64
         arch_suffix = "_x64" if is_64bit else "_x86"
@@ -314,7 +495,6 @@ def apply_update(request):
                 break
 
         if not download_url:
-            # Fallback to the generic ZIP
             for asset in assets:
                 if asset.get("name") == "P2P_Arbitrage.zip":
                     download_url = asset.get("browser_download_url")
@@ -324,7 +504,6 @@ def apply_update(request):
         if not download_url:
             return Response({'error': 'No se encontro archivo ZIP en la release'}, status=502)
 
-        # Hardening: Validate download_url domain
         if not (download_url.startswith("https://github.com/") or download_url.startswith("https://objects.githubusercontent.com/")):
             return Response({'error': 'URL de descarga no autorizada (dominio no confiable)'}, status=400)
 
@@ -336,131 +515,24 @@ def apply_update(request):
     except Exception as e:
         return Response({'error': f'Error verificando actualizacion: {str(e)}'}, status=500)
 
-    tmp_dir = Path(tempfile.mkdtemp(prefix="p2p_update_"))
-    zip_path = tmp_dir / "update.zip"
-    try:
-        resp = requests.get(download_url, stream=True, timeout=120)
-        resp.raise_for_status()
-        with open(zip_path, 'wb') as f:
-            for chunk in resp.iter_content(chunk_size=8192):
-                f.write(chunk)
-    except Exception as e:
-        shutil.rmtree(tmp_dir, ignore_errors=True)
-        return Response({'error': f'Error descargando: {str(e)}'}, status=502)
+    # Spawn background thread to run update
+    set_update_status("downloading", 0)
+    thread = threading.Thread(
+        target=run_update_in_background,
+        args=(download_url, zip_name, assets, tag, DATA_DIR, BASE_DIR),
+        daemon=True
+    )
+    thread.start()
 
-    # Cryptographic integrity validation via SHA-256 Checksum
-    sha256_url = None
-    expected_sha256_name = zip_name + ".sha256" if zip_name else ""
-    for asset in assets:
-        if asset.get("name") == expected_sha256_name:
-            sha256_url = asset.get("browser_download_url")
-            break
+    return Response({'success': True, 'status': 'started', 'message': 'Actualizacion iniciada en segundo plano'})
 
-    if not sha256_url:
-        shutil.rmtree(tmp_dir, ignore_errors=True)
-        return Response({'error': f'Falta firma digital (.sha256) para el archivo {zip_name or "de actualizacion"}. Abortando por seguridad.'}, status=400)
 
-    try:
-        sha_resp = requests.get(sha256_url, timeout=10)
-        sha_resp.raise_for_status()
-        expected_hash = sha_resp.text.strip().split()[0].lower()
-    except Exception as e:
-        shutil.rmtree(tmp_dir, ignore_errors=True)
-        return Response({'error': f'Error descargando firma digital de actualizacion: {str(e)}'}, status=502)
-
-    sha256_hash = hashlib.sha256()
-    try:
-        with open(zip_path, "rb") as f:
-            for byte_block in iter(lambda: f.read(4096), b""):
-                sha256_hash.update(byte_block)
-        calculated_hash = sha256_hash.hexdigest().lower()
-    except Exception as e:
-        shutil.rmtree(tmp_dir, ignore_errors=True)
-        return Response({'error': f'Error calculando integridad del archivo: {str(e)}'}, status=500)
-
-    if calculated_hash != expected_hash:
-        shutil.rmtree(tmp_dir, ignore_errors=True)
-        return Response({
-            'error': f'Violacion de integridad. El hash calculado ({calculated_hash}) no coincide con el publicado ({expected_hash}). Abortando instalacion.'
-        }, status=400)
-
-    extract_dir = tmp_dir / "extracted"
-    try:
-        with zipfile.ZipFile(zip_path, 'r') as zf:
-            zf.extractall(extract_dir)
-    except zipfile.BadZipFile:
-        shutil.rmtree(tmp_dir, ignore_errors=True)
-        return Response({'error': 'Archivo ZIP corrupto'}, status=502)
-
-    items = list(extract_dir.iterdir())
-    source_dir = items[0] if len(items) == 1 and items[0].is_dir() else extract_dir
-
-    app_dir = str(DATA_DIR).replace("'", "''")
-    src_dir = str(source_dir).replace("'", "''")
-
-    ps_script = f'''
-$ErrorActionPreference = "Stop"
-$appDir = '{app_dir}'
-$srcDir = '{src_dir}'
-
-Write-Host "Esperando cierre del proceso..."
-$maxWait = 30
-$waited = 0
-while ($waited -lt $maxWait) {{
-    $proc = Get-Process -Name "P2P_Arbitrage" -ErrorAction SilentlyContinue
-    if (-not $proc) {{ break }}
-    Start-Sleep -Seconds 1
-    $waited++
-}}
-
-Write-Host "Reemplazando archivos..."
-Get-ChildItem -Path $appDir -Recurse -File | Where-Object {{
-    $_.FullName -notlike "*db.sqlite3*" -and
-    $_.FullName -notlike "*update_state.json*" -and
-    $_.FullName -notlike "*secret_key.json*" -and
-    $_.FullName -notlike "*auth_token.json*"
-}} | Remove-Item -Force -ErrorAction SilentlyContinue
-
-Get-ChildItem -Path $srcDir -Recurse -File | ForEach-Object {{
-    $rel = $_.FullName.Substring($srcDir.Length).TrimStart('\\')
-    $dest = Join-Path $appDir $rel
-    $destDir = Split-Path $dest -Parent
-    if (-not (Test-Path $destDir)) {{ New-Item -ItemType Directory -Path $destDir -Force | Out-Null }}
-    Copy-Item -Path $_.FullName -Destination $dest -Force
-}}
-
-Write-Host "Limpiando archivos temporales..."
-Remove-Item -Path (Split-Path $srcDir) -Recurse -Force -ErrorAction SilentlyContinue
-
-Write-Host "Iniciando P2P Arbitrage..."
-Start-Process -FilePath (Join-Path $appDir "P2P_Arbitrage.exe")
-
-Remove-Item -Path $PSCommandPath -Force -ErrorAction SilentlyContinue
-'''
-    updater_path = tmp_dir / "updater.ps1"
-    with open(updater_path, 'w', encoding='utf-8') as f:
-        f.write(ps_script)
-
-    try:
-        subprocess.Popen(
-            ['powershell', '-ExecutionPolicy', 'Bypass', '-File', str(updater_path)],
-            creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0)
-        )
-    except Exception as e:
-        shutil.rmtree(tmp_dir, ignore_errors=True)
-        return Response({'error': f'Error lanzando actualizador: {str(e)}'}, status=500)
-
-    def shutdown_server():
-        time.sleep(2)
-        sys.exit(0)
-
-    threading.Thread(target=shutdown_server, daemon=True).start()
-
-    return Response({
-        'success': True,
-        'message': f'Actualizando a {tag}... El servidor se reiniciara.',
-        'new_version': tag.lstrip('v'),
-    })
+@api_view(['GET'])
+def get_update_progress(request):
+    if not _check_auth(request):
+        return Response({'error': 'Autenticacion requerida. Envie Authorization: Bearer <token>'}, status=401)
+    with update_status_lock:
+        return Response(update_status)
 
 
 @api_view(['GET'])

@@ -51,6 +51,22 @@ export async function applyUpdate(): Promise<{ success: boolean; message: string
   }
 }
 
+export interface UpdateProgress {
+  status: 'idle' | 'downloading' | 'verifying' | 'extracting' | 'ready' | 'error';
+  progress: number;
+  error_message: string | null;
+}
+
+export async function getUpdateProgress(): Promise<UpdateProgress | null> {
+  try {
+    const response = await authFetch(`${API_BASE_URL}/update-progress/`);
+    if (!response.ok) return null;
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchAuthToken(): Promise<string | null> {
   return await fetchTokenFromServer();
 }

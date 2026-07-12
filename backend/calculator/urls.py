@@ -3,7 +3,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     CalculationViewSet, DailyLogViewSet, 
     WalletViewSet, TransactionViewSet,
-    calculate_p2p, get_bcv_rate, reset_database, check_update, apply_update, get_auth_token, get_version
+    calculate_p2p, get_bcv_rate, reset_database, check_update, apply_update, get_update_progress, get_auth_token, get_version
 )
 
 router = DefaultRouter()
@@ -18,6 +18,7 @@ urlpatterns = [
     path('reset-db/', reset_database, name='reset-db'),
     path('update-check/', check_update, name='update-check'),
     path('update-apply/', apply_update, name='update-apply'),
+    path('update-progress/', get_update_progress, name='update-progress'),
     path('auth-token/', get_auth_token, name='auth-token'),
     path('version/', get_version, name='version'),
     path('', include(router.urls)),

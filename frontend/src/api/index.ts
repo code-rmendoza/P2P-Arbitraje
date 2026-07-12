@@ -16,5 +16,5 @@ export { normalizeWallets, fetchWallets, saveWallet, deleteWallet } from './wall
 export type { Transaction } from './transactions';
 export { fetchTransactions, saveTransaction, deleteTransaction } from './transactions';
 
-export type { UpdateInfo } from './system';
-export { fetchBcvRate, checkUpdate, fetchVersion, applyUpdate, fetchAuthToken, resetDatabaseSecure } from './system';
+export type { UpdateInfo, UpdateProgress } from './system';
+export { fetchBcvRate, checkUpdate, fetchVersion, applyUpdate, getUpdateProgress, fetchAuthToken, resetDatabaseSecure } from './system';
