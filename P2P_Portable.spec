@@ -118,6 +118,14 @@ django_imports = [
     'requests',
 ]
 
+# Dynamically add all migrations of the calculator app
+migrations_dir = os.path.join(BACKEND, 'calculator', 'migrations')
+if os.path.exists(migrations_dir):
+    django_imports.append('calculator.migrations')
+    for f in os.listdir(migrations_dir):
+        if f.endswith('.py') and not f.startswith('__'):
+            django_imports.append(f"calculator.migrations.{f[:-3]}")
+
 import django
 django_dir = os.path.dirname(django.__file__)
 django_locale = os.path.join(django_dir, 'conf', 'locale')
