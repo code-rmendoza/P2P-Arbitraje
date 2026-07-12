@@ -257,7 +257,7 @@ Get-ChildItem -Path $appDir -Recurse -File | Where-Object {{
 }} | Remove-Item -Force -ErrorAction SilentlyContinue
 
 Get-ChildItem -Path $srcDir -Recurse -File | ForEach-Object {{
-    $rel = $_.FullName.Substring($srcDir.Length)
+    $rel = $_.FullName.Substring($srcDir.Length).TrimStart('\\')
     $dest = Join-Path $appDir $rel
     $destDir = Split-Path $dest -Parent
     if (-not (Test-Path $destDir)) {{ New-Item -ItemType Directory -Path $destDir -Force | Out-Null }}
