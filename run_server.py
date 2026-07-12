@@ -52,6 +52,23 @@ settings.CORS_ALLOW_ALL_ORIGINS = False
 
 django.setup()
 
+# Verify critical columns exist; if not, reset their migration record so migrate re-applies
+try:
+    import sqlite3 as _sqlite3
+    _db_path = str(DATA_DIR / 'db.sqlite3')
+    if Path(_db_path).exists():
+        _conn = _sqlite3.connect(_db_path)
+        _cursor = _conn.execute("PRAGMA table_info(calculator_transaction)")
+        _cols = {row[1] for row in _cursor.fetchall()}
+        _conn.close()
+        if 'category' not in _cols:
+            _conn = _sqlite3.connect(_db_path)
+            _conn.execute("DELETE FROM django_migrations WHERE app='calculator' AND name LIKE '0009%'")
+            _conn.commit()
+            _conn.close()
+except Exception:
+    pass
+
 # Always run migrate on startup to ensure database schema is up-to-date
 try:
     call_command('migrate', verbosity=0)
