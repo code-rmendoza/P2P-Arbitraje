@@ -334,6 +334,7 @@ function App() {
               txCommission={portfolio.txCommission} setTxCommission={portfolio.setTxCommission}
               txManualAmountIn={portfolio.txManualAmountIn} setTxManualAmountIn={portfolio.setTxManualAmountIn}
               txAmountInDisplay={portfolio.txAmountInDisplay}
+              txCategory={portfolio.txCategory} setTxCategory={portfolio.setTxCategory}
               txNotes={portfolio.txNotes} setTxNotes={portfolio.setTxNotes}
               ledgerWalletFilter={portfolio.ledgerWalletFilter} setLedgerWalletFilter={portfolio.setLedgerWalletFilter}
               ledgerLimit={portfolio.ledgerLimit} setLedgerLimit={portfolio.setLedgerLimit}
@@ -359,6 +360,7 @@ function App() {
               isFetchingBcv={isFetchingBcv}
               onFetchBcvRate={handleFetchBcvRate}
               logs={appData.logs}
+              transactions={appData.transactions}
             />
           )}
         </div>

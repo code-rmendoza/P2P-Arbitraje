@@ -98,6 +98,8 @@ class Transaction(models.Model):
         ('DEPOSITO', 'Depósito'),
         ('RETIRO', 'Retiro'),
         ('TRANSFERENCIA', 'Transferencia'),
+        ('GASTO', 'Gasto Operativo'),
+        ('INGRESO_EXTERNO', 'Ingreso Externo'),
     ]
     
     date = models.DateTimeField(db_index=True)
@@ -118,6 +120,7 @@ class Transaction(models.Model):
     rate = models.DecimalField(max_digits=12, decimal_places=4, default=1.0)  # Tasa de cambio utilizada
     commission_pct = models.DecimalField(max_digits=6, decimal_places=4, default=0.0)  # Comisión P2P %
     
+    category = models.CharField(max_length=50, blank=True, null=True, default=None)  # Categoría contable/fiscal
     notes = models.TextField(blank=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
 

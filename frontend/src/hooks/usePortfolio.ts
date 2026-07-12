@@ -108,6 +108,8 @@ export function usePortfolio(
     setTxManualAmountIn: txFormHook.setTxManualAmountIn,
     txNotes: txFormHook.txNotes,
     setTxNotes: txFormHook.setTxNotes,
+    txCategory: txFormHook.txCategory,
+    setTxCategory: txFormHook.setTxCategory,
     txDate: txFormHook.txDate,
     setTxDate: txFormHook.setTxDate,
     txTypeOverride: txFormHook.txTypeOverride,

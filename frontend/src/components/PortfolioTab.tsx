@@ -31,6 +31,8 @@ interface PortfolioTabProps {
   txManualAmountIn: string;
   setTxManualAmountIn: (v: string) => void;
   txAmountInDisplay: string;
+  txCategory: string;
+  setTxCategory: (v: string) => void;
   txNotes: string;
   setTxNotes: (v: string) => void;
   ledgerWalletFilter: string;
@@ -69,6 +71,7 @@ export function PortfolioTab({
   txCommission, setTxCommission,
   txManualAmountIn, setTxManualAmountIn,
   txAmountInDisplay,
+  txCategory, setTxCategory,
   txNotes, setTxNotes,
   ledgerWalletFilter, setLedgerWalletFilter,
   ledgerLimit, setLedgerLimit,
@@ -348,8 +351,34 @@ export function PortfolioTab({
             <option value="DEPOSITO">DEPOSITO</option>
             <option value="RETIRO">RETIRO</option>
             <option value="TRANSFERENCIA">TRANSFERENCIA</option>
+            <option value="GASTO">GASTO OPERATIVO</option>
+            <option value="INGRESO_EXTERNO">INGRESO NO P2P</option>
           </select>
         </div>
+        {['GASTO', 'INGRESO_EXTERNO'].includes(transactionType) && (
+          <div className="form-group">
+            <label className="form-label">Categoría Contable</label>
+            <select className="form-input" value={txCategory} onChange={(e) => setTxCategory(e.target.value)}>
+              <option value="">Seleccionar categoría...</option>
+              {transactionType === 'GASTO' ? (
+                <>
+                  <option value="Comisiones Bancarias">Comisiones Bancarias</option>
+                  <option value="Servicios (Internet/Luz/Teléfono)">Servicios (Internet/Luz/Teléfono)</option>
+                  <option value="Alquiler / Oficina">Alquiler / Oficina</option>
+                  <option value="Equipos / Hardware">Equipos / Hardware</option>
+                  <option value="Impuestos / Tasas">Impuestos / Tasas</option>
+                  <option value="Otros Gastos">Otros Gastos</option>
+                </>
+              ) : (
+                <>
+                  <option value="Servicios Profesionales">Servicios Profesionales</option>
+                  <option value="Ventas Varias">Ventas Varias</option>
+                  <option value="Otros Ingresos No P2P">Otros Ingresos No P2P</option>
+                </>
+              )}
+            </select>
+          </div>
+        )}
         <div className="form-group">
           <label className="form-label">Fecha de Operacion</label>
           <input type="datetime-local" className="form-input input-date-compact" value={txDate} onChange={(e) => setTxDate(e.target.value)} />
@@ -427,7 +456,12 @@ export function PortfolioTab({
                 displayedTransactions.map(tx => (
                   <tr key={tx.id}>
                     <td>{new Date(tx.date).toLocaleString()}</td>
-                    <td><span className={`tx-badge ${tx.type.toLowerCase().replace('_p2p', '')}`}>{tx.type.replace('_P2P', '')}</span></td>
+                    <td>
+                      <span className={`tx-badge ${tx.type.toLowerCase().replace('_p2p', '').replace('_externo', '')}`}>
+                        {tx.type.replace('_P2P', '').replace('_EXTERNO', ' NO P2P')}
+                      </span>
+                      {tx.category && <div className="metric-desc" style={{ fontSize: '0.75rem', marginTop: '0.1rem' }}>{tx.category}</div>}
+                    </td>
                     <td>
                       <div className="tx-route-col">
                         <span>{tx.wallet_from_name || 'Externo'}</span>

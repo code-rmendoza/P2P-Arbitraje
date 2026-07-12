@@ -1,5 +1,5 @@
-import { DollarSign, Info, RefreshCw, CheckCircle } from 'lucide-react';
-import type { DailyLog } from '../api';
+import { DollarSign, Info, RefreshCw, CheckCircle, TrendingDown, TrendingUp } from 'lucide-react';
+import type { DailyLog, Transaction } from '../api';
 import { formatNumber } from '../utils/currency';
 
 interface TaxesTabProps {
@@ -11,6 +11,7 @@ interface TaxesTabProps {
   isFetchingBcv: boolean;
   onFetchBcvRate: () => void;
   logs: DailyLog[];
+  transactions: Transaction[];
 }
 
 export function TaxesTab({
@@ -20,6 +21,7 @@ export function TaxesTab({
   isFetchingBcv,
   onFetchBcvRate,
   logs,
+  transactions,
 }: TaxesTabProps) {
   const currentYearFiscalLogs = logs.filter(log => {
     const d = new Date(log.date + 'T00:00:00');
@@ -27,7 +29,44 @@ export function TaxesTab({
   });
 
   const yearProfitUsdt = currentYearFiscalLogs.reduce((sum, log) => sum + log.profit, 0);
-  const profitInBoli = yearProfitUsdt * tasaBcv;
+  const p2pProfitVes = yearProfitUsdt * tasaBcv;
+
+  // Filtrar transacciones del año seleccionado
+  const currentYearTransactions = transactions.filter(tx => {
+    const d = new Date(tx.date);
+    return d.getFullYear() === year;
+  });
+
+  // Helper para convertir transacción a VES
+  const convertTxToVes = (tx: Transaction, amount: number, walletCurrency: string | null | undefined): number => {
+    if (walletCurrency === 'VES') return amount;
+    const rate = tx.rate > 0 ? tx.rate : tasaBcv;
+    return amount * rate;
+  };
+
+  // Calcular ingresos y gastos deducibles
+  const expensesByCategory: Record<string, number> = {};
+  let totalExpensesVes = 0;
+  const incomesByCategory: Record<string, number> = {};
+  let totalIncomesVes = 0;
+
+  currentYearTransactions.forEach(tx => {
+    if (tx.type === 'GASTO') {
+      const vesAmount = convertTxToVes(tx, tx.amount_out, tx.wallet_from_currency);
+      totalExpensesVes += vesAmount;
+      const cat = tx.category || 'Otros Gastos';
+      expensesByCategory[cat] = (expensesByCategory[cat] || 0) + vesAmount;
+    } else if (tx.type === 'INGRESO_EXTERNO') {
+      const vesAmount = convertTxToVes(tx, tx.amount_in, tx.wallet_to_currency);
+      totalIncomesVes += vesAmount;
+      const cat = tx.category || 'Otros Ingresos No P2P';
+      incomesByCategory[cat] = (incomesByCategory[cat] || 0) + vesAmount;
+    }
+  });
+
+  // Base gravable real (no puede ser menor a 0 a efectos de cálculo de impuestos)
+  const baseImponibleVes = p2pProfitVes + totalIncomesVes - totalExpensesVes;
+  const profitInBoli = baseImponibleVes > 0 ? baseImponibleVes : 0;
   const profitInUt = valorUt > 0 ? profitInBoli / valorUt : 0;
 
   const islrBrackets = [
@@ -101,9 +140,9 @@ export function TaxesTab({
           </div>
         </div>
         <div className="calendar-stat-item">
-          <span className="calendar-stat-label">Profit Gravable (VES)</span>
-          <span className="calendar-stat-value profit" style={{ fontSize: '1.5rem' }}>
-            +{formatNumber(yearProfitUsdt)} USDT
+          <span className="calendar-stat-label">Base Imponible Neto (VES)</span>
+          <span className="calendar-stat-value profit" style={{ fontSize: '1.5rem', color: baseImponibleVes >= 0 ? 'var(--color-success)' : 'var(--color-danger)' }}>
+            Bs. {formatNumber(profitInBoli)}
           </span>
         </div>
       </div>
@@ -112,48 +151,109 @@ export function TaxesTab({
         <div className="fiscal-alert success">
           <Info style={{ width: '1.25rem', height: '1.25rem', flexShrink: 0 }} />
           <div>
-            <strong>Bajo el minimo de 1.000 UT — No obligado a declarar.</strong> Tus ganancias totales anuales de <strong>{formatNumber(profitInUt)} UT</strong> estan por debajo del limite minimo establecido de 1,000 UT. No estas legalmente obligado a realizar pago de ISLR segun la tarifa N 1.
+            <strong>Bajo el mínimo de 1.000 UT — No obligado a pagar ISLR.</strong> Tus ingresos netos gravables de <strong>{formatNumber(profitInUt)} UT</strong> están por debajo del límite mínimo establecido de 1,000 UT. No estás obligado a pagar impuesto de renta, pero debes declarar según la Tarifa Nº 1.
           </div>
         </div>
       ) : (
         <div className="fiscal-alert warning">
           <Info style={{ width: '1.25rem', height: '1.25rem', flexShrink: 0 }} />
           <div>
-            <strong>Obligacion de Declaracion Activa.</strong> Tus ingresos netos de <strong>{formatNumber(profitInUt)} UT</strong> exceden las 1,000 UT anuales. Debes presentar tu declaracion estimada y definitiva de ISLR.
+            <strong>Obligación de Declaración y Pago Activa.</strong> Tus ingresos netos gravables de <strong>{formatNumber(profitInUt)} UT</strong> exceden las 1,000 UT anuales. Debes presentar tu declaración estimada y definitiva de ISLR.
           </div>
         </div>
       )}
 
       <div className="metrics-grid" style={{ marginBottom: '1.5rem' }}>
         <div className="metric-card success">
-          <div className="metric-label">Profit Real VES</div>
-          <div className="metric-value">{formatNumber(yearProfitUsdt)} USDT</div>
-          <div className="metric-desc">Suma acumulada gravable del ano {year}</div>
+          <div className="metric-label">Ganancia P2P</div>
+          <div className="metric-value">Bs. {formatNumber(p2pProfitVes)}</div>
+          <div className="metric-desc">Acumulado P2P (${formatNumber(yearProfitUsdt)} USDT)</div>
+        </div>
+        <div className="metric-card success" style={{ borderLeft: '4px solid var(--color-success)' }}>
+          <div className="metric-label">Otros Ingresos</div>
+          <div className="metric-value">Bs. {formatNumber(totalIncomesVes)}</div>
+          <div className="metric-desc">Ingresos no P2P / Ext.</div>
+        </div>
+        <div className="metric-card warning" style={{ borderLeft: '4px solid var(--color-danger)' }}>
+          <div className="metric-label" style={{ color: 'var(--color-danger)' }}>Gastos Operativos</div>
+          <div className="metric-value" style={{ color: 'var(--color-danger)' }}>
+            Bs. {formatNumber(totalExpensesVes)}
+          </div>
+          <div className="metric-desc">Costos deducibles del año</div>
         </div>
         <div className="metric-card accent">
-          <div className="metric-label">En Bolivares</div>
-          <div className="metric-value">Bs. {formatNumber(profitInBoli)}</div>
-          <div className="metric-desc">Tasa BCV de cambio: {formatNumber(tasaBcv, 4)} Bs/USDT</div>
-        </div>
-        <div className="metric-card success">
-          <div className="metric-label">En Unidades Tributarias (UT)</div>
+          <div className="metric-label">Base Gravable UT</div>
           <div className="metric-value">{formatNumber(profitInUt)} UT</div>
           <div className="metric-desc">Valor UT de referencia: Bs. {formatNumber(valorUt)}</div>
         </div>
-        <div className="metric-card warning" style={{ borderLeft: '4px solid var(--color-danger)' }}>
-          <div className="metric-label" style={{ color: 'var(--color-danger)' }}>ISLR Estimado a Pagar</div>
-          <div className="metric-value" style={{ color: 'var(--color-danger)' }}>
-            ${formatNumber(taxOwedUsdt)}
-            <span style={{ fontSize: '0.8rem', marginLeft: '0.25rem', fontWeight: 500 }}>USDT</span>
+      </div>
+
+      <div className="metrics-grid" style={{ marginBottom: '1.5rem', gridTemplateColumns: '1fr' }}>
+        <div className="metric-card warning" style={{ borderLeft: '4px solid var(--color-danger)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div className="metric-label" style={{ color: 'var(--color-danger)', fontSize: '0.9rem' }}>Impuesto ISLR Estimado a Pagar</div>
+            <div className="metric-desc">Bs. {formatNumber(taxOwedBoli)} (~{formatNumber(taxOwedUt, 1)} UT) a tasa del {((activeBracket?.rate || 0) * 100).toFixed(0)}%</div>
           </div>
-          <div className="metric-desc">Bs. {formatNumber(taxOwedBoli)} (~{formatNumber(taxOwedUt, 1)} UT)</div>
+          <div className="metric-value" style={{ color: 'var(--color-danger)', fontSize: '2rem' }}>
+            ${formatNumber(taxOwedUsdt)}
+            <span style={{ fontSize: '0.9rem', marginLeft: '0.25rem', fontWeight: 500 }}>USDT</span>
+          </div>
         </div>
       </div>
 
-      <div style={{ padding: '0.85rem 1.25rem', backgroundColor: 'var(--bg-app)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      {/* Desglose de Gastos e Ingresos por Categoría */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
+        <div className="card" style={{ padding: '1.25rem', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', backgroundColor: 'var(--bg-card)' }}>
+          <h4 className="card-title" style={{ fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', color: 'var(--text-color)' }}>
+            <TrendingUp style={{ width: '1.1rem', height: '1.1rem', color: 'var(--color-success)' }} />
+            Ingresos Adicionales
+          </h4>
+          {Object.keys(incomesByCategory).length === 0 ? (
+            <div className="text-muted" style={{ fontSize: '0.85rem' }}>No hay otros ingresos registrados este año.</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {Object.entries(incomesByCategory).map(([cat, val]) => (
+                <div key={cat} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.25rem' }}>
+                  <span>{cat}</span>
+                  <span style={{ fontWeight: 600, color: 'var(--color-success)' }}>+Bs. {formatNumber(val)}</span>
+                </div>
+              ))}
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', fontWeight: 700, marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px dashed var(--border-color)' }}>
+                <span>Total Ingresos Extra</span>
+                <span>Bs. {formatNumber(totalIncomesVes)}</span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="card" style={{ padding: '1.25rem', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', backgroundColor: 'var(--bg-card)' }}>
+          <h4 className="card-title" style={{ fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', color: 'var(--text-color)' }}>
+            <TrendingDown style={{ width: '1.1rem', height: '1.1rem', color: 'var(--color-danger)' }} />
+            Gastos y Costos Deducibles
+          </h4>
+          {Object.keys(expensesByCategory).length === 0 ? (
+            <div className="text-muted" style={{ fontSize: '0.85rem' }}>No hay gastos operativos registrados este año.</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {Object.entries(expensesByCategory).map(([cat, val]) => (
+                <div key={cat} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.25rem' }}>
+                  <span>{cat}</span>
+                  <span style={{ fontWeight: 600, color: 'var(--color-danger)' }}>-Bs. {formatNumber(val)}</span>
+                </div>
+              ))}
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', fontWeight: 700, marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px dashed var(--border-color)' }}>
+                <span>Total Deducciones</span>
+                <span>Bs. {formatNumber(totalExpensesVes)}</span>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div style={{ padding: '0.85rem 1.25rem', backgroundColor: 'rgba(37, 99, 235, 0.05)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span>
           <CheckCircle style={{ width: '1rem', height: '1rem', display: 'inline', color: 'var(--color-primary)', marginRight: '0.5rem', verticalAlign: 'text-bottom' }} />
-          <strong>Separacion de Carteras:</strong> El sistema detecto <strong>${formatNumber(yearUsdProfitTotal)} USDT</strong> de ganancias puras en USD (Zinli, Wally) que <strong>fueron excluidas</strong> de este calculo fiscal.
+          <strong>Separación de Carteras:</strong> El sistema detectó <strong>${formatNumber(yearUsdProfitTotal)} USDT</strong> de ganancias puras en USD (Zinli, Wally) que <strong>fueron excluidas</strong> del cálculo del impuesto venezolano.
         </span>
         <span style={{ fontWeight: 700, color: 'var(--color-primary)' }}>Excluido: ${formatNumber(yearUsdProfitTotal)} USD</span>
       </div>

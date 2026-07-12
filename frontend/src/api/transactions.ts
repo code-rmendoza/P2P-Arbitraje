@@ -4,13 +4,14 @@ import type { Wallet } from './wallets';
 export interface Transaction {
   id?: number;
   date: string;
-  type: 'VENTA_P2P' | 'COMPRA_P2P' | 'DEPOSITO' | 'RETIRO' | 'TRANSFERENCIA';
+  type: 'VENTA_P2P' | 'COMPRA_P2P' | 'DEPOSITO' | 'RETIRO' | 'TRANSFERENCIA' | 'GASTO' | 'INGRESO_EXTERNO';
   wallet_from?: number | null;
   wallet_to?: number | null;
   amount_out: number;
   amount_in: number;
   rate: number;
   commission_pct: number;
+  category?: string | null;
   notes: string;
   created_at?: string;
   wallet_from_name?: string | null;

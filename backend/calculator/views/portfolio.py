@@ -88,14 +88,14 @@ class TransactionViewSet(viewsets.ModelViewSet):
                 {"error": "El monto de entrada debe ser mayor a cero cuando hay billetera destino."},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        if tx_type == 'DEPOSITO' and wallet_from:
+        if tx_type in ['DEPOSITO', 'INGRESO_EXTERNO'] and wallet_from:
             return Response(
-                {"error": "Un depósito debe tener origen externo, sin billetera origen."},
+                {"error": "Esta operación requiere origen externo (sin billetera origen)."},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        if tx_type == 'RETIRO' and wallet_to:
+        if tx_type in ['RETIRO', 'GASTO'] and wallet_to:
             return Response(
-                {"error": "Un retiro debe tener destino externo, sin billetera destino."},
+                {"error": "Esta operación requiere destino externo (sin billetera destino)."},
                 status=status.HTTP_400_BAD_REQUEST
             )
         if tx_type in ['VENTA_P2P', 'COMPRA_P2P', 'TRANSFERENCIA'] and (not wallet_from or not wallet_to):

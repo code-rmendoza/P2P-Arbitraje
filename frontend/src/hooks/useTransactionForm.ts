@@ -12,6 +12,7 @@ export function useTransactionForm(
   const [txRate, setTxRate] = useState<number>(0);
   const [txCommission, setTxCommission] = useState<number>(0);
   const [txManualAmountIn, setTxManualAmountIn] = useState<string>('');
+  const [txCategory, setTxCategory] = useState<string>('');
   const [txNotes, setTxNotes] = useState<string>('');
   const [txDate, setTxDate] = useState<string>(() => getLocalDatetimeString());
   const [txTypeOverride, setTxTypeOverride] = useState<Transaction['type'] | 'AUTO'>('AUTO');
@@ -49,7 +50,7 @@ export function useTransactionForm(
         ? txAmountOut * commissionFactor
         : txAmountOut * txRate * commissionFactor;
     }
-    if (transactionType === 'DEPOSITO') return txAmountOut;
+    if (transactionType === 'DEPOSITO' || transactionType === 'INGRESO_EXTERNO') return txAmountOut;
     return 0;
   };
 
@@ -101,12 +102,14 @@ export function useTransactionForm(
         amount_in: selectedWalletTo ? parseFloat(effectiveTxAmountIn.toFixed(2)) : 0,
         rate: txRate,
         commission_pct: txCommission,
+        category: ['GASTO', 'INGRESO_EXTERNO'].includes(transactionType) ? (txCategory || 'Otros') : null,
         notes: txNotes,
       }, tasaBcv);
 
       setTxAmountOut(0);
       setTxRate(1.0);
       setTxManualAmountIn('');
+      setTxCategory('');
       setTxNotes('');
       setTxDate(getLocalDatetimeString());
       await loadData();
@@ -131,6 +134,7 @@ export function useTransactionForm(
     txRate, setTxRate,
     txCommission, setTxCommission,
     txManualAmountIn, setTxManualAmountIn,
+    txCategory, setTxCategory,
     txNotes, setTxNotes,
     txDate, setTxDate,
     txTypeOverride, setTxTypeOverride,
