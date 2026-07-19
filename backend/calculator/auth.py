@@ -1,5 +1,6 @@
 import json
 import secrets
+import hmac
 from rest_framework.permissions import BasePermission
 from .utils import _get_data_dir
 
@@ -12,14 +13,11 @@ def _get_secret_token():
             data = json.load(f)
             return data.get('token', '')
     except (FileNotFoundError, json.JSONDecodeError):
-        import secrets
         token = secrets.token_urlsafe(32)
         with open(token_file, 'w') as f:
             json.dump({'token': token}, f)
         return token
 
-
-import hmac
 
 
 def _check_auth(request):

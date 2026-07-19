@@ -14,18 +14,15 @@ import webbrowser
 from pathlib import Path
 from datetime import date
 
-def get_base_path():
-    if getattr(sys, 'frozen', False):
-        return Path(sys._MEIPASS)
-    return Path(__file__).resolve().parent
+if not getattr(sys, 'frozen', False):
+    backend_path = Path(__file__).resolve().parent / 'backend'
+    if str(backend_path) not in sys.path:
+        sys.path.insert(0, str(backend_path))
 
-def get_data_path():
-    if getattr(sys, 'frozen', False):
-        return Path(sys.executable).parent
-    return Path(__file__).resolve().parent / 'backend'
+from calculator.utils import load_json, parse_version, _get_data_dir, _get_project_root
 
-BASE_DIR = get_base_path()
-DATA_DIR = get_data_path()
+BASE_DIR = _get_project_root()
+DATA_DIR = _get_data_dir()
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'p2p_project.settings')
 
@@ -42,7 +39,12 @@ settings.DATABASES['default']['NAME'] = str(DATA_DIR / 'db.sqlite3')
 settings.STATIC_ROOT = str(BASE_DIR / 'staticfiles')
 settings.DEBUG = False
 
-if HOST == '0.0.0.0':
+env_hosts = os.environ.get('DJANGO_ALLOWED_HOSTS')
+if env_hosts:
+    settings.ALLOWED_HOSTS = [h.strip() for h in env_hosts.split(',') if h.strip()]
+elif HOST == '0.0.0.0':
+    print("  [ADVERTENCIA DE SEGURIDAD] DJANGO_ALLOWED_HOSTS no esta configurado.")
+    print("  Habilitando '*' de forma temporal. Se recomienda configurar DJANGO_ALLOWED_HOSTS en produccion.")
     settings.ALLOWED_HOSTS = ['*']
 else:
     settings.ALLOWED_HOSTS = [HOST, '127.0.0.1', 'localhost']
@@ -170,13 +172,6 @@ else:
 
 MAX_DAILY_CHECKS = 10
 
-def load_json(path, default=None):
-    try:
-        with open(path, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return default
-
 def save_json(path, data):
     with open(path, 'w', encoding='utf-8') as f:
         json.dump(data, f, indent=2)
@@ -194,13 +189,6 @@ def get_local_version():
     if v is None:
         v = load_json(BASE_DIR / 'version.json', {})
     return v.get('version', '0.0.0')
-
-def parse_version(v):
-    try:
-        parts = v.strip().lstrip('v').split('.')
-        return tuple(int(x) for x in parts)
-    except (ValueError, AttributeError):
-        return (0, 0, 0)
 
 def load_update_state():
     state_path = DATA_DIR / 'update_state.json'
@@ -270,8 +258,18 @@ def download_and_update(tag, zip_url):
     try:
         resp = requests.get(zip_url, stream=True, timeout=120)
         resp.raise_for_status()
+        
+        total_size = int(resp.headers.get('content-length', 0)) if hasattr(resp, 'headers') else 0
+        MAX_UPDATE_SIZE = 100 * 1024 * 1024  # 100 MB limit
+        if total_size > MAX_UPDATE_SIZE:
+            raise Exception("El archivo de actualización excede el tamaño de descarga máximo permitido (100MB).")
+            
+        downloaded = 0
         with open(zip_path, 'wb') as f:
             for chunk in resp.iter_content(chunk_size=8192):
+                downloaded += len(chunk)
+                if downloaded > MAX_UPDATE_SIZE:
+                    raise Exception("El tamaño de descarga excede el límite máximo permitido (100MB).")
                 f.write(chunk)
     except Exception as e:
         print(f"  Error descargando: {e}")
@@ -281,9 +279,14 @@ def download_and_update(tag, zip_url):
     extract_dir = tmp_dir / "extracted"
     try:
         with zipfile.ZipFile(zip_path, 'r') as zf:
+            # Prevent Zip Slip / Path Traversal
+            for member in zf.namelist():
+                member_path = (extract_dir / member).resolve()
+                if not str(member_path).startswith(str(extract_dir.resolve())):
+                    raise Exception(f"Intento de Path Traversal detectado en el ZIP: {member}")
             zf.extractall(extract_dir)
-    except zipfile.BadZipFile:
-        print("  Error: archivo ZIP corrupto")
+    except Exception as e:
+        print(f"  Error al descomprimir actualizacion: {e}")
         shutil.rmtree(tmp_dir, ignore_errors=True)
         return False
 

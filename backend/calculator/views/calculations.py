@@ -7,7 +7,7 @@ from calculator.serializers import CalculationSerializer
 from calculator.auth import RequireAuthForDestructive
 
 
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 def compute_p2p_math(capital, tasa_venta, tasa_compra, ciclos_dia, 
                      tipo_operativa='USD',
@@ -60,13 +60,13 @@ def calculate_p2p(request):
         )
 
     try:
-        capital = float(capital)
-        tasa_venta = float(tasa_venta)
-        tasa_compra = float(tasa_compra)
+        capital = Decimal(str(capital))
+        tasa_venta = Decimal(str(tasa_venta))
+        tasa_compra = Decimal(str(tasa_compra))
         ciclos_dia = int(ciclos_dia)
-        comision_compra = float(comision_compra)
-        comision_venta = float(comision_venta)
-    except (TypeError, ValueError):
+        comision_compra = Decimal(str(comision_compra))
+        comision_venta = Decimal(str(comision_venta))
+    except (TypeError, ValueError, InvalidOperation):
         return Response(
             {"error": "Todos los valores numericos deben ser numeros validos"},
             status=status.HTTP_400_BAD_REQUEST

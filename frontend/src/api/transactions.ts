@@ -24,7 +24,7 @@ export interface Transaction {
 
 export async function fetchTransactions(): Promise<Transaction[]> {
   try {
-    const response = await fetch(`${API_BASE_URL}/transactions/`);
+    const response = await authFetch(`${API_BASE_URL}/transactions/`);
     if (!response.ok) throw new Error('Error al obtener transacciones del servidor');
     const data: Transaction[] = await response.json();
     const normalized = data.map(tx => ({
@@ -117,49 +117,7 @@ export async function saveTransaction(
     txs.unshift(finalTx);
     localStorage.setItem('p2p_transactions', JSON.stringify(txs));
 
-    // Handle offline DailyLog creation
-    if (input.type === 'COMPRA_P2P' || input.type === 'VENTA_P2P') {
-      const amountToUsdtLocal = (amount: number, currency?: string | null) => {
-        if (currency === 'USDT' || currency === 'USD') return amount;
-        if (currency === 'VES') return tasaBcv > 0 ? amount / tasaBcv : 0;
-        return 0;
-      };
 
-      const txDateStr = finalTx.date.split('T')[0];
-      const fromCurr = fromW?.currency || null;
-      const toCurr = toW?.currency || null;
-
-      const vol = fromCurr === 'USDT' || fromCurr === 'USD'
-        ? input.amount_out
-        : (toCurr === 'USDT' || toCurr === 'USD' ? input.amount_in : amountToUsdtLocal(input.amount_out, fromCurr));
-
-      const inUsdt = amountToUsdtLocal(input.amount_in, toCurr);
-      const outUsdt = amountToUsdtLocal(input.amount_out, fromCurr);
-      const prof = inUsdt - outUsdt;
-
-      const localLogs = localStorage.getItem('p2p_logs');
-      const listLogs = localLogs ? JSON.parse(localLogs) : [];
-
-      const newLog = {
-        id: Date.now(),
-        date: txDateStr,
-        profit: parseFloat(prof.toFixed(4)),
-        volume: parseFloat(vol.toFixed(2)),
-        notes: `[Auto-Transaccion #${finalTx.id}] Movimiento: ${input.type} | Ruta: ${fromW?.name || 'Externo'} → ${toW?.name || 'Externo'} | Tasa: ${input.rate} | Notas: ${input.notes || ''}`,
-        imported: true,
-        tipo_operativa: fromCurr === 'VES' || toCurr === 'VES' ? 'VES' : 'USD',
-        plataforma_compra: input.type === 'COMPRA_P2P' ? toW?.platform || 'P2P' : fromW?.platform || 'P2P',
-        plataforma_venta: input.type === 'VENTA_P2P' ? fromW?.platform || 'P2P' : toW?.platform || 'P2P',
-        comision_compra: input.type === 'COMPRA_P2P' ? input.commission_pct : 0,
-        comision_venta: input.type === 'VENTA_P2P' ? input.commission_pct : 0,
-        metodo_compra: input.type === 'COMPRA_P2P' ? fromW?.name || 'P2P' : toW?.name || 'P2P',
-        metodo_venta: input.type === 'VENTA_P2P' ? fromW?.name || 'P2P' : toW?.name || 'P2P',
-      };
-
-      listLogs.push(newLog);
-      listLogs.sort((a: any, b: any) => b.date.localeCompare(a.date));
-      localStorage.setItem('p2p_logs', JSON.stringify(listLogs));
-    }
 
     return finalTx;
   }
@@ -189,13 +147,7 @@ export async function deleteTransaction(id: number): Promise<void> {
         localStorage.setItem('p2p_wallets', JSON.stringify(updatedWallets));
         localStorage.setItem('p2p_transactions', JSON.stringify(txs.filter(t => t.id !== id)));
         
-        // Also delete associated local DailyLog
-        const localLogs = localStorage.getItem('p2p_logs');
-        if (localLogs) {
-          const listLogs = JSON.parse(localLogs);
-          const filteredLogs = listLogs.filter((log: any) => !log.notes.includes(`[Auto-Transaccion #${id}]`));
-          localStorage.setItem('p2p_logs', JSON.stringify(filteredLogs));
-        }
+
       }
     }
   }

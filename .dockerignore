@@ -1,0 +1,36 @@
+# Git
+.git
+.gitignore
+
+# Python virtual environments
+**/venv/
+venv/
+*.pyc
+__pycache__/
+
+# Node / JS dependencies and build artifacts
+**/node_modules/
+node_modules/
+**/dist/
+**/build/
+frontend/.pnpm-store/
+
+# App Runtime Data / Databases / Secrets
+*.sqlite3
+*.sqlite3-journal
+secret_key.json
+auth_token.json
+update_state.json
+bcv_rate_cache.json
+*.zip
+
+# IDE configurations
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini

@@ -1,9 +1,13 @@
 import sys
 import json
+import os
 from pathlib import Path
 
 
 def _get_data_dir():
+    env_dir = os.environ.get('P2P_DATA_DIR')
+    if env_dir:
+        return Path(env_dir)
     if getattr(sys, 'frozen', False):
         return Path(sys.executable).parent
     return Path(__file__).resolve().parent.parent
@@ -23,3 +27,9 @@ def parse_version(v):
         return tuple(int(x) for x in parts)
     except (ValueError, AttributeError):
         return (0, 0, 0)
+
+
+def _get_project_root():
+    if getattr(sys, 'frozen', False):
+        return Path(sys._MEIPASS)
+    return Path(__file__).resolve().parent.parent.parent

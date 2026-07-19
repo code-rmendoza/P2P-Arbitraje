@@ -5,7 +5,6 @@ from decimal import Decimal
 class Calculation(models.Model):
     label = models.CharField(max_length=100)
     capital = models.DecimalField(max_digits=14, decimal_places=2)
-    comision = models.DecimalField(max_digits=6, decimal_places=4, default=Decimal('0.35'))  # Legacy field
     
     # Multi-Currency / Multi-Platform fields
     tipo_operativa = models.CharField(max_length=20, default='USD')

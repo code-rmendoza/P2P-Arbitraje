@@ -11,7 +11,7 @@ services:
       - P2P_PORT=8000
       - P2P_HOST=0.0.0.0
     volumes:
-      - p2p_data:/app
+      - p2p_data:/app/data
     restart: unless-stopped
 
 volumes:

@@ -20,6 +20,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 
 def _get_data_dir():
+    env_dir = __import__('os').environ.get('P2P_DATA_DIR')
+    if env_dir:
+        return Path(env_dir)
     if getattr(sys, 'frozen', False):
         return Path(sys.executable).parent
     return BASE_DIR
@@ -113,7 +116,7 @@ WSGI_APPLICATION = 'p2p_project.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'NAME': _get_data_dir() / 'db.sqlite3',
     }
 }
 

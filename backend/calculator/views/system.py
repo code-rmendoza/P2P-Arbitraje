@@ -21,21 +21,17 @@ from django.db import transaction as db_transaction
 
 from calculator.models import Calculation, DailyLog, Wallet, Transaction
 from calculator.auth import _check_auth, _get_secret_token
-from calculator.utils import _get_data_dir, load_json, parse_version
+from calculator.utils import _get_data_dir, load_json, parse_version, _get_project_root
 
 logger = logging.getLogger('calculator')
 
 
 def _resolve_data_path():
-    if getattr(sys, 'frozen', False):
-        return Path(sys.executable).parent
-    return Path(__file__).resolve().parent.parent.parent
+    return _get_data_dir()
 
 
 def _resolve_base_path():
-    if getattr(sys, 'frozen', False):
-        return Path(sys._MEIPASS)
-    return Path(__file__).resolve().parent.parent.parent.parent
+    return _get_project_root()
 
 
 @api_view(['GET'])
@@ -77,14 +73,18 @@ def get_bcv_rate(request):
     ssl_bypassed = False
     try:
         response = requests.get('https://www.bcv.org.ve/', headers=headers, verify=True, timeout=10)
-    except requests.exceptions.SSLError:
-        try:
-            import urllib3
-            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-            response = requests.get('https://www.bcv.org.ve/', headers=headers, verify=False, timeout=10)
-            ssl_bypassed = True
-        except Exception as e:
-            scraping_error = str(e)
+    except requests.exceptions.SSLError as ssl_err:
+        skip_ssl = os.environ.get('P2P_SKIP_SSL_VERIFY', 'false').lower() in ('true', '1', 'yes')
+        if skip_ssl:
+            try:
+                import urllib3
+                urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+                response = requests.get('https://www.bcv.org.ve/', headers=headers, verify=False, timeout=10)
+                ssl_bypassed = True
+            except Exception as e:
+                scraping_error = str(e)
+        else:
+            scraping_error = f"Error SSL: {str(ssl_err)}. Configure la variable de entorno P2P_SKIP_SSL_VERIFY=true si confia en el origen pero tiene problemas de certificados locales."
     except Exception as e:
         scraping_error = str(e)
         
@@ -298,12 +298,19 @@ def run_update_in_background(download_url, zip_name, assets, tag, DATA_DIR, BASE
         resp = requests.get(download_url, stream=True, timeout=120)
         resp.raise_for_status()
         total_size = int(resp.headers.get('content-length', 0)) if hasattr(resp, 'headers') else 0
+        
+        MAX_UPDATE_SIZE = 100 * 1024 * 1024  # 100 MB limit
+        if total_size > MAX_UPDATE_SIZE:
+            raise Exception("El archivo de actualización excede el tamaño máximo permitido (100MB).")
+            
         downloaded = 0
         
         with open(zip_path, 'wb') as f:
             for chunk in resp.iter_content(chunk_size=16384):
-                f.write(chunk)
                 downloaded += len(chunk)
+                if downloaded > MAX_UPDATE_SIZE:
+                    raise Exception("El tamaño de descarga excede el límite máximo permitido (100MB).")
+                f.write(chunk)
                 if total_size > 0:
                     percent = int((downloaded / total_size) * 100)
                     percent = min(100, max(0, percent))
@@ -340,6 +347,11 @@ def run_update_in_background(download_url, zip_name, assets, tag, DATA_DIR, BASE
         set_update_status("extracting", 100)
         extract_dir = tmp_dir / "extracted"
         with zipfile.ZipFile(zip_path, 'r') as zf:
+            # Prevent Zip Slip / Path Traversal
+            for member in zf.namelist():
+                member_path = (extract_dir / member).resolve()
+                if not str(member_path).startswith(str(extract_dir.resolve())):
+                    raise Exception(f"Intento de Path Traversal detectado en el ZIP: {member}")
             zf.extractall(extract_dir)
 
         items = list(extract_dir.iterdir())
@@ -440,7 +452,8 @@ Remove-Item -Path $PSCommandPath -Force -ErrorAction SilentlyContinue
         # Shutdown server after 2 seconds
         def shutdown_server():
             time.sleep(2)
-            sys.exit(0)
+            import os
+            os._exit(0)
             
         threading.Thread(target=shutdown_server, daemon=True).start()
 

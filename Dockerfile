@@ -18,6 +18,10 @@ WORKDIR /app
 ENV PYTHONUNBUFFERED=1
 ENV P2P_PORT=8000
 ENV P2P_HOST=0.0.0.0
+ENV P2P_DATA_DIR=/app/data
+
+# Crear directorio de datos para persistencia
+RUN mkdir -p /app/data
 
 # Copiar dependencias de Python e instalar
 COPY backend/requirements.txt ./

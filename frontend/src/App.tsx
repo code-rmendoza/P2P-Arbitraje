@@ -63,18 +63,18 @@ function App() {
 
   const appData = useAppData();
   const calc = useCalculator();
-  const logbook = useLogbook(appData.logs, () => appData.loadData(tasaBcvRef.current));
+  const logbook = useLogbook(appData.logs, () => appData.loadData());
   const portfolio = usePortfolio(
     appData.wallets,
     appData.transactions,
-    () => appData.loadData(tasaBcvRef.current),
+    () => appData.loadData(),
   );
 
   const tasaBcvRef = useRef(tasaBcv);
   tasaBcvRef.current = tasaBcv;
 
   useEffect(() => {
-    appData.loadData(tasaBcv).then(() => setIsLoading(false));
+    appData.loadData().then(() => setIsLoading(false));
     const autoFetchBcv = async () => {
       try {
         const rate = await fetchBcvRate();
@@ -82,8 +82,13 @@ function App() {
       } catch { /* ignore */ }
     };
     autoFetchBcv();
-    const interval = setInterval(() => appData.loadData(tasaBcvRef.current), 30000);
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        appData.loadData();
+      }
+    }, 60000);
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleApplyUpdate = async () => {
@@ -177,7 +182,7 @@ function App() {
     const ok = await calc.handleSaveSimulation(saveLabel);
     if (ok) {
       setIsSaveModalOpen(false);
-      appData.loadData(tasaBcv);
+      appData.loadData();
       showNotification('Simulacion guardada exitosamente');
     }
   };
@@ -185,7 +190,7 @@ function App() {
   const handleDeleteSimulation = async (id: number) => {
     const ok = await calc.handleDeleteSimulation(id);
     if (ok) {
-      appData.loadData(tasaBcv);
+      appData.loadData();
       showNotification('Simulacion eliminada');
     }
   };
@@ -237,7 +242,7 @@ function App() {
         accumulate: logbook.closeOperativeAccumulate,
       });
       logbook.setIsCloseOperativeModalOpen(false);
-      appData.loadData(tasaBcv);
+      appData.loadData();
       showNotification('Operativa registrada en la bitacora');
     } catch { /* ignore */ }
   };
@@ -265,25 +270,15 @@ function App() {
   return (
     <div className="app-container">
       {isLoading && (
-        <div style={{
-          position: 'fixed', inset: 0, backgroundColor: 'var(--bg-app)',
-          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-          zIndex: 9999, gap: '1rem',
-        }}>
-          <Loader2 style={{ width: '2.5rem', height: '2.5rem', color: 'var(--color-primary)', animation: 'spin 1s linear infinite' }} />
-          <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>Cargando datos...</span>
+        <div className="loading-overlay">
+          <Loader2 className="loading-spinner" />
+          <span className="loading-text">Cargando datos...</span>
         </div>
       )}
 
       {notification && (
-        <div style={{
-          position: 'fixed', bottom: '2rem', right: '2rem',
-          backgroundColor: notification.type === 'success' ? 'var(--color-success)' : 'var(--color-primary)',
-          color: '#ffffff', padding: '0.85rem 1.5rem', borderRadius: 'var(--radius-sm)',
-          boxShadow: 'var(--shadow-lg)', display: 'flex', alignItems: 'center', gap: '0.5rem',
-          fontWeight: 600, fontSize: '0.9rem', zIndex: 200, animation: 'modalSlide 0.2s ease-out',
-        }}>
-          <CheckCircle style={{ width: '1.2rem', height: '1.2rem' }} />
+        <div className={`toast-notification ${notification.type}`}>
+          <CheckCircle className="icon-large" />
           {notification.message}
         </div>
       )}
@@ -481,19 +476,15 @@ function App() {
       />
 
       {updateProgress && (
-        <div style={{
-          position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.75)',
-          backdropFilter: 'blur(8px)', display: 'flex', flexDirection: 'column',
-          alignItems: 'center', justifyContent: 'center', zIndex: 10000, padding: '2rem'
-        }}>
-          <div className="card" style={{ maxWidth: '480px', width: '100%', padding: '2rem', textAlign: 'center', boxShadow: 'var(--shadow-2xl)', border: '1px solid var(--border-color)' }}>
-            <ArrowUpCircle style={{ width: '3.5rem', height: '3.5rem', color: 'var(--color-primary)', margin: '0 auto 1.5rem', animation: updateProgress.status !== 'error' && updateProgress.status !== 'ready' ? 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' : 'none' }} />
+        <div className="update-overlay">
+          <div className="card update-card">
+            <ArrowUpCircle className={`update-icon ${updateProgress.status !== 'error' && updateProgress.status !== 'ready' ? 'animating' : ''}`} />
             
-            <h3 className="card-title" style={{ fontSize: '1.25rem', marginBottom: '0.75rem' }}>
+            <h3 className="card-title update-title">
               {reconnecting ? 'Reiniciando Servidor...' : 'Actualizando Aplicación'}
             </h3>
             
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
+            <p className="update-text">
               {updateProgress.status === 'downloading' && `Descargando archivos de actualización: ${updateProgress.progress}%`}
               {updateProgress.status === 'verifying' && 'Verificando firma digital y firmas de seguridad (SHA-256)...'}
               {updateProgress.status === 'extracting' && 'Extrayendo paquete de actualización...'}
@@ -502,26 +493,23 @@ function App() {
             </p>
 
             {updateProgress.status !== 'error' && (
-              <div style={{ width: '100%', height: '8px', backgroundColor: 'var(--border-color)', borderRadius: '9999px', overflow: 'hidden', marginBottom: '1rem' }}>
-                <div style={{
-                  width: `${updateProgress.status === 'downloading' ? updateProgress.progress : 100}%`,
-                  height: '100%',
-                  backgroundColor: reconnecting ? 'var(--color-success)' : 'var(--color-primary)',
-                  transition: 'width 0.3s ease-out',
-                  borderRadius: '9999px',
-                }} />
+              <div className="update-progress-container">
+                <div 
+                  className={`update-progress-bar ${reconnecting ? 'success' : 'primary'}`}
+                  style={{ width: `${updateProgress.status === 'downloading' ? updateProgress.progress : 100}%` }}
+                />
               </div>
             )}
 
             {reconnecting && (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', color: 'var(--color-success)', fontSize: '0.85rem', fontWeight: 600 }}>
-                <Loader2 style={{ width: '1rem', height: '1rem', animation: 'spin 1s linear infinite' }} />
+              <div className="update-reconnect-container">
+                <Loader2 className="update-reconnect-spinner" />
                 <span>Intentando reconectar...</span>
               </div>
             )}
 
             {updateProgress.status === 'error' && (
-              <button className="btn btn-primary" onClick={() => { setUpdateProgress(null); setUpdating(false); }} style={{ marginTop: '0.5rem' }}>
+              <button className="btn btn-primary update-close-btn" onClick={() => { setUpdateProgress(null); setUpdating(false); }}>
                 Cerrar
               </button>
             )}
