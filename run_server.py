@@ -301,7 +301,9 @@ def download_and_update(tag, zip_url):
     src_dir = str(source_dir).replace("'", "''")
 
     ps_script = f'''
-$ErrorActionPreference = "Stop"
+# Retraso inicial para dar tiempo a liberar locks de cierre de Django
+Start-Sleep -Seconds 2
+
 $appDir = '{app_dir}'
 $srcDir = '{src_dir}'
 
@@ -315,21 +317,57 @@ while ($waited -lt $maxWait) {{
     $waited++
 }}
 
-Write-Host "Reemplazando archivos..."
+Write-Host "Eliminando archivos anteriores..."
 Get-ChildItem -Path $appDir -Recurse -File | Where-Object {{
     $_.FullName -notlike "*db.sqlite3*" -and
     $_.FullName -notlike "*update_state.json*" -and
     $_.FullName -notlike "*secret_key.json*" -and
-    $_.FullName -notlike "*auth_token.json*" -and
-    $_.FullName -notlike "*updater.ps1*"
-}} | Remove-Item -Force -ErrorAction SilentlyContinue
+    $_.FullName -notlike "*auth_token.json*"
+}} | ForEach-Object {{
+    $filePath = $_.FullName
+    $tries = 0
+    while ($tries -lt 5) {{
+        try {{
+            Remove-Item -Path $filePath -Force -ErrorAction Stop
+            break
+        }} catch {{
+            $tries++
+            Start-Sleep -Seconds 1
+        }}
+    }}
+}}
 
+# Limpiar directorios vacios anteriores
+Get-ChildItem -Path $appDir -Recurse -Directory | Sort-Object -Property FullName -Descending | ForEach-Object {{
+    Remove-Item -Path $_.FullName -Force -ErrorAction SilentlyContinue
+}}
+
+# Funcion segura de copia con reintentos
+function Safe-CopyItem ($src, $dest) {{
+    $tries = 5
+    $count = 0
+    while ($count -lt $tries) {{
+        try {{
+            Copy-Item -Path $src -Destination $dest -Force -ErrorAction Stop
+            return
+        }} catch {{
+            $count++
+            if ($count -eq $tries) {{
+                Write-Warning "No se pudo copiar $src a $dest despues de $tries intentos."
+            }} else {{
+                Start-Sleep -Seconds 1
+            }}
+        }}
+    }}
+}}
+
+Write-Host "Copiando nuevos archivos..."
 Get-ChildItem -Path $srcDir -Recurse -File | ForEach-Object {{
     $rel = $_.FullName.Substring($srcDir.Length).TrimStart('\\')
     $dest = Join-Path $appDir $rel
     $destDir = Split-Path $dest -Parent
     if (-not (Test-Path $destDir)) {{ New-Item -ItemType Directory -Path $destDir -Force | Out-Null }}
-    Copy-Item -Path $_.FullName -Destination $dest -Force
+    Safe-CopyItem $_.FullName $dest
 }}
 
 Write-Host "Limpiando archivos temporales..."
